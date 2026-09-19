@@ -5,9 +5,9 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   <div class="mx-auto max-w-6xl px-4 pt-8">
     <h1 class="text-3xl font-bold">Счета с QR</h1>
     <p class="mt-1 text-sm text-slate-600">
-      Покажите QR клиенту с экрана или распечатайте счёт — не нужно диктовать номер карты.
-      Настоящая one-tap оплата работает, если вставить SBP-строку из вашего банка;
-      иначе QR содержит реквизиты для копирования. Автоподтверждение оплаты — с бэкендом.
+      Покажите QR клиенту с экрана или распечатайте счёт — без похода в банк.
+      QR-визитка содержит сумму, услугу и ваш телефон для СБП — клиент вводит сумму вручную в своём банке.
+      Банковский SBP-QR (опционально) — в расширенных настройках ниже.
     </p>
 
     <div class="mt-4 grid gap-3 sm:grid-cols-3 text-sm">
@@ -32,19 +32,28 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
           <label class="grid gap-1">Карта (необязательно)
             <input id="p-card" inputmode="numeric" class="rounded-lg border px-3 py-2" placeholder="0000 0000 0000 0000" />
           </label>
-          <label class="grid gap-1">SBP-строка из банка (для настоящей оплаты)
-            <textarea id="p-sbp" rows="2" class="rounded-lg border px-3 py-2" placeholder="Вставьте payload статического QR из приложения банка"></textarea>
-          </label>
-          <label class="grid gap-1">…или фото QR из банка (проще — строку добывать не нужно)
-            <input id="p-qrfile" type="file" accept="image/*" class="text-sm" />
-            <img id="p-qrpreview" alt="Загруженный QR-код из банка" class="w-[120px] h-[120px] border rounded-lg bg-white object-contain" hidden />
-          </label>
+          <details class="rounded-xl bg-slate-50 p-3">
+            <summary class="cursor-pointer font-medium">Расширенно: банковский SBP-QR (необязательно)</summary>
+            <label class="grid gap-1 mt-2">SBP-строка из банка
+              <textarea id="p-sbp" rows="2" class="rounded-lg border px-3 py-2" placeholder="Вставьте payload статического QR из приложения банка"></textarea>
+            </label>
+            <label class="grid gap-1 mt-2">…или фото QR из банка
+              <input id="p-qrfile" type="file" accept="image/*" class="text-sm" />
+              <img id="p-qrpreview" alt="Загруженный QR-код из банка" class="w-[120px] h-[120px] border rounded-lg bg-white object-contain" hidden />
+            </label>
+            <p class="text-xs text-slate-500 mt-1">Без этого будет обычная QR-визитка — её достаточно, банк не нужен.</p>
+          </details>
           <button class="rounded-lg bg-slate-900 px-4 py-2 text-white font-medium hover:bg-slate-700">Сохранить реквизиты</button>
           <p id="p-status" class="text-slate-600" role="status" aria-live="polite"></p>
         </form>
 
         <form id="invoice-form" class="rounded-2xl border bg-white p-5 grid gap-3 text-sm" novalidate>
           <h2 class="font-semibold text-base">Новый счёт</h2>
+          <label class="grid gap-1">Услуга
+            <select id="i-service" class="rounded-lg border px-3 py-2"></select>
+            <input id="i-service-custom" class="rounded-lg border px-3 py-2 mt-1" placeholder="Вручную: например, консультация" hidden />
+            <span class="text-xs text-slate-500"><a class="underline" href="./services/">Мои услуги</a></span>
+          </label>
           <label class="grid gap-1">Клиент
             <input id="i-client" class="rounded-lg border px-3 py-2" placeholder="Кто платит" />
           </label>
@@ -52,6 +61,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
             <input id="i-amount" type="number" min="1" class="rounded-lg border px-3 py-2" placeholder="5000" />
           </label>
           <ul id="i-errors" class="text-red-700 grid gap-1" aria-live="polite"></ul>
+          <p id="i-warn" class="text-amber-700 bg-amber-50 rounded-lg p-2" hidden></p>
           <button class="rounded-lg bg-indigo-600 px-4 py-2.5 text-white font-medium hover:bg-indigo-700">Выставить счёт с QR</button>
         </form>
       </div>
@@ -69,7 +79,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 <script>
   import QRCode from 'qrcode';
   import {
-    addInvoice, fmtMoney, getInvoices, getPayProfile, markInvoicePaid,
+    addInvoice, fmtMoney, getInvoices, getPayProfile, getServices, invoiceWarning, markInvoicePaid,
     removeInvoice, savePayProfile, unpaidTotal, validateInvoice,
   } from '@/lib/store';
   import { track } from '@/lib/analytics';
@@ -110,7 +120,33 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     document.getElementById('p-status').textContent = 'Реквизиты сохранены в этом браузере.';
   });
 
-  // --- Счета ---
+  // --- Счета: услуги ---
+  const svc = document.getElementById('i-service');
+  const svcCustom = document.getElementById('i-service-custom');
+  const iAmount = document.getElementById('i-amount');
+  function fillInvServices() {
+    svc.innerHTML = getServices().map((s) => `<option value="${s.name}" data-price="${s.defaultPrice ?? ''}">${s.name}${s.defaultPrice !== null ? ` — ${fmtMoney(s.defaultPrice)}` : ''}</option>`).join('') + '<option value="__custom">— Ввести вручную —</option>';
+  }
+  fillInvServices();
+  svc.addEventListener('change', () => {
+    const isCustom = svc.value === '__custom';
+    svcCustom.hidden = !isCustom;
+    if (!isCustom) {
+      const price = svc.selectedOptions[0]?.dataset.price;
+      if (price) iAmount.value = price;
+      svcCustom.value = '';
+    }
+  });
+  function currentInvService(): string {
+    return svc.value === '__custom' ? (svcCustom.value ?? '') : (svc.value ?? '');
+  }
+  const warnEl = document.getElementById('i-warn');
+  function refreshWarn() {
+    const w = invoiceWarning();
+    if (w) { warnEl.textContent = w; warnEl.hidden = false; } else warnEl.hidden = true;
+  }
+  refreshWarn();
+
   const list = document.getElementById('inv-list');
 
   async function render() {
@@ -119,7 +155,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     document.getElementById('inv-total').textContent = fmtMoney(unpaidTotal());
     document.getElementById('inv-paid').textContent = fmtMoney(all.filter((i) => i.status === 'paid').reduce((s, i) => s + i.amount, 0));
 
-  const qrCaption = { sbp: 'QR из банка: сканируйте для оплаты', image: 'Ваш QR из банка: сканируйте для оплаты', details: 'QR-визитка: реквизиты для копирования' };
+  const qrCaption = { sbp: 'QR из банка: сканируйте для оплаты', image: 'Ваш QR из банка: сканируйте для оплаты', details: 'QR-визитка: клиент введёт сумму вручную' };
 
     list.innerHTML = all.length
       ? all.map((inv) => `<li class="rounded-xl border p-4 grid sm:grid-cols-[150px_1fr] gap-4">
@@ -128,7 +164,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
             <p class="mt-1 text-xs ${inv.qrKind === 'details' ? 'text-slate-500' : 'text-green-700'}">${qrCaption[inv.qrKind]}</p>
           </div>
           <div>
-            <p><strong>${fmtMoney(inv.amount)}</strong> · ${inv.client} ${inv.status === 'paid' ? '<span class="text-xs font-normal text-green-700 bg-green-50 rounded px-2 py-0.5">оплачен</span>' : '<span class="text-xs font-normal text-amber-700 bg-amber-100 rounded px-2 py-0.5">ждёт оплаты</span>'}</p>
+            <p><strong>${fmtMoney(inv.amount)}</strong> · ${inv.client}${inv.service ? ` · ${inv.service}` : ''} ${inv.status === 'paid' ? '<span class="text-xs font-normal text-green-700 bg-green-50 rounded px-2 py-0.5">оплачен</span>' : '<span class="text-xs font-normal text-amber-700 bg-amber-100 rounded px-2 py-0.5">ждёт оплаты</span>'}</p>
             ${inv.receiptNumber ? `<p class="text-slate-600">По предчеку №${inv.receiptNumber}</p>` : ''}
             <p class="text-slate-600">Получатель: ${inv.payee || '—'}${inv.phone ? ` · СБП: ${inv.phone}` : ''}${inv.bank ? ` · ${inv.bank}` : ''}</p>
             <div class="mt-2 flex flex-wrap gap-2">
@@ -152,6 +188,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     e.preventDefault();
     const input = {
       client: document.getElementById('i-client').value ?? '',
+      service: currentInvService(),
       amount: Number(document.getElementById('i-amount').value),
     };
     const errors = validateInvoice(input);
@@ -160,6 +197,8 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     addInvoice(input);
     track('invoice_created', { amount: input.amount });
     e.target.reset();
+    fillInvServices(); svcCustom.hidden = true;
+    refreshWarn();
     render();
   });
 

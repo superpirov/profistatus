@@ -25,14 +25,24 @@ import { link } from '@/lib/site';
           Пока нет чеков — <a class="underline" href={link('app/receipts')}>выставьте первый</a>, и здесь появится график.
         </p>
       </section>
-      <section class="rounded-2xl border bg-white p-5" aria-label="Последние чеки">
+      <section class="rounded-2xl border bg-white p-5" aria-label="Доход по услугам">
         <div class="flex items-center justify-between">
-          <h2 class="font-semibold">Последние чеки</h2>
-          <a class="text-sm underline" href={link('app/receipts')}>Все чеки</a>
+          <h2 class="font-semibold">Доход по услугам</h2>
+          <a class="text-sm underline" href={link('app/services')}>Мои услуги</a>
         </div>
-        <ul id="recent" class="mt-3 grid gap-2 text-sm"></ul>
+        <div id="services-chart" class="mt-3"></div>
+        <ul id="services-list" class="mt-2 grid gap-1 text-sm"></ul>
+        <p id="services-empty" class="mt-2 text-sm text-slate-500" hidden>Добавьте услуги и выставляйте чеки — здесь появится разбивка.</p>
       </section>
     </div>
+
+    <section class="mt-6 rounded-2xl border bg-white p-5" aria-label="Последние чеки">
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold">Последние чеки</h2>
+        <a class="text-sm underline" href={link('app/receipts')}>Все чеки</a>
+      </div>
+      <ul id="recent" class="mt-3 grid gap-2 text-sm"></ul>
+    </section>
 
     <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
       <a href={link('app/receipts')} class="rounded-2xl border bg-indigo-600 text-white p-5 hover:bg-indigo-700">
@@ -56,7 +66,7 @@ import { link } from '@/lib/site';
 </BaseLayout>
 
 <script>
-  import { fmtMoney, getMyOrders, getReceipts, monthlyTotals, yearTax, yearTotal } from '@/lib/store';
+  import { fmtMoney, getMyOrders, getReceipts, monthlyTotals, revenueByService, yearTax, yearTotal } from '@/lib/store';
 
   const year = new Date().getFullYear();
   const receipts = getReceipts();
@@ -81,6 +91,22 @@ import { link } from '@/lib/site';
       return `<g><rect x="${x}" y="${H - 18 - h}" width="${w}" height="${h}" rx="4" fill="#4f46e5"><title>${m.label}: ${fmtMoney(m.total)}</title></rect><text x="${x + w / 2}" y="${H - 4}" font-size="10" text-anchor="middle" fill="#64748b">${m.label}</text></g>`;
     }).join('');
     chart.innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="w-full" role="img" aria-label="График дохода">${bars}</svg>`;
+  }
+
+  // График по услугам
+  const bySvc = revenueByService();
+  const svcChart = document.getElementById('services-chart')!;
+  const svcList = document.getElementById('services-list')!;
+  if (bySvc.length === 0) {
+    document.getElementById('services-empty')!.hidden = false;
+  } else {
+    const maxSvc = Math.max(1, ...bySvc.map((x) => x.total));
+    const colors = ['#4f46e5', '#06b6d4', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6'];
+    svcChart.innerHTML = bySvc.slice(0, 5).map((x, i) => {
+      const w = Math.round((x.total / maxSvc) * 100);
+      return `<div class="flex items-center gap-2 text-xs"><span class="w-24 truncate">${x.service}</span><div class="flex-1 bg-slate-100 rounded h-3 overflow-hidden"><div style="width:${w}%;background:${colors[i % colors.length]}" class="h-3"></div></div><span class="w-20 text-right font-medium">${fmtMoney(x.total)}</span></div>`;
+    }).join('');
+    svcList.innerHTML = bySvc.slice(0, 5).map((x) => `<li class="flex justify-between"><span>${x.service} · ${x.count} чеков</span><strong>${fmtMoney(x.total)}</strong></li>`).join('');
   }
 
   const recent = document.getElementById('recent')!;

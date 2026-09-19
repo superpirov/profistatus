@@ -14,7 +14,9 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
       <form id="receipt-form" class="rounded-2xl border bg-white p-5 grid gap-3 text-sm" novalidate>
         <h2 class="font-semibold text-base">Новый предчек</h2>
         <label class="grid gap-1">Услуга или товар
-          <input id="f-service" class="rounded-lg border px-3 py-2" placeholder="Например: дизайн лендинга" />
+          <select id="f-service" class="rounded-lg border px-3 py-2"></select>
+          <span class="text-xs text-slate-500">Выберите из <a class="underline" href="../services/">моих услуг</a> или впишите вручную</span>
+          <input id="f-service-custom" class="rounded-lg border px-3 py-2 mt-1" placeholder="Вручную: например, дизайн лендинга" hidden />
         </label>
         <label class="grid gap-1">Клиент
           <input id="f-client" class="rounded-lg border px-3 py-2" placeholder="Имя, ИП или организация" />
@@ -60,10 +62,11 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 </BaseLayout>
 
 <script>
-  import { addInvoice, addReceipt, fmtDate, fmtMoney, calcTax, getReceipts, removeReceipt, todayIso, validateReceipt } from '@/lib/store';
+  import { addInvoice, addReceipt, fmtDate, fmtMoney, calcTax, getReceipts, getServices, removeReceipt, todayIso, validateReceipt } from '@/lib/store';
   import { track } from '@/lib/analytics';
 
   const service = document.getElementById('f-service');
+  const serviceCustom = document.getElementById('f-service-custom');
   const client = document.getElementById('f-client');
   const amount = document.getElementById('f-amount');
   const date = document.getElementById('f-date');
@@ -72,10 +75,32 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   const history = document.getElementById('history');
   date.value = todayIso();
 
+  function fillServices() {
+    const opts = getServices().map((s) => `<option value="${s.name}" data-price="${s.defaultPrice ?? ''}">${s.name}${s.defaultPrice !== null ? ` — ${fmtMoney(s.defaultPrice)}` : ''}</option>`).join('');
+    service.innerHTML = opts + '<option value="__custom">— Ввести вручную —</option>';
+  }
+  fillServices();
+  function currentService(): string {
+    if (service.value === '__custom') return serviceCustom.value ?? '';
+    return service.value ?? '';
+  }
+  service.addEventListener('change', () => {
+    const isCustom = service.value === '__custom';
+    serviceCustom.hidden = !isCustom;
+    if (!isCustom) {
+      const opt = service.selectedOptions[0];
+      const price = opt?.dataset.price;
+      if (price) amount.value = price;
+      serviceCustom.value = '';
+    }
+    refreshTax();
+  });
+  serviceCustom.addEventListener('input', refreshTax);
+
   function readForm() {
     const ctype = document.querySelector('input[name="ctype"]:checked');
     return {
-      service: service.value ?? '',
+      service: currentService(),
       client: client.value ?? '',
       clientType: (ctype?.value ?? 'individual'),
       amount: Number(amount.value),
@@ -87,7 +112,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     const f = readForm();
     taxEl.textContent = Number.isFinite(f.amount) && f.amount > 0 ? fmtMoney(calcTax(f.amount, f.clientType)) : '—';
   }
-  [service, client, amount, date].forEach((el) => el?.addEventListener('input', refreshTax));
+  [client, amount, date].forEach((el) => el?.addEventListener('input', refreshTax));
   document.querySelectorAll('input[name="ctype"]').forEach((el) => el.addEventListener('change', refreshTax));
   refreshTax();
 
@@ -114,7 +139,8 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     if (errors.length) return;
     addReceipt(input);
     track('receipt_created', { amount: input.amount });
-    service.value = ''; client.value = ''; amount.value = '';
+    fillServices(); serviceCustom.value = ''; serviceCustom.hidden = true;
+    client.value = ''; amount.value = '';
     refreshTax();
     renderHistory();
   });
@@ -154,7 +180,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
       // Счёт с QR по чеку: реквизиты подтянутся из профиля, дальше — на страницу счетов
       const r = getReceipts().find((x) => x.id === btn.dataset.inv);
       if (r) {
-        addInvoice({ client: r.client, amount: r.amount, receiptId: r.id, receiptNumber: r.number });
+        addInvoice({ client: r.client, amount: r.amount, service: r.service, receiptId: r.id, receiptNumber: r.number });
         track('invoice_created', { amount: r.amount, from: 'receipt' });
         window.location.href = '../invoices/';
       }

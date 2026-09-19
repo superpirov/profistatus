@@ -42,6 +42,7 @@ const KEYS = {
   counter: 'profistatus:receipt-counter:v1',
   profile: 'profistatus:pay-profile:v1', // реквизиты самозанятого для QR-оплаты
   invoices: 'profistatus:invoices:v1', // выставленные счета с QR
+  services: 'profistatus:services:v1', // каталог услуг самозанятого
 } as const;
 
 /** Годовой лимит дохода самозанятого по 422-ФЗ, ₽ */
@@ -288,14 +289,86 @@ export function hasResponded(id: string): boolean {
   return load<string[]>(KEYS.responded, []).includes(id);
 }
 
+// ---------- Каталог услуг ----------
+
+export interface ServiceItem {
+  id: string;
+  name: string;
+  defaultPrice: number | null; // подсказка при выборе услуги
+  description?: string;
+}
+
+export function getServices(): ServiceItem[] {
+  const list = load<ServiceItem[]>(KEYS.services, []);
+  // Сид для первого запуска — чтобы было что выбрать
+  if (list.length === 0) {
+    const seed: ServiceItem[] = [
+      { id: 's-consult', name: 'Консультация', defaultPrice: 3000 },
+      { id: 's-design', name: 'Дизайн', defaultPrice: 15000 },
+      { id: 's-dev', name: 'Разработка', defaultPrice: 40000 },
+    ];
+    save(KEYS.services, seed);
+    return seed;
+  }
+  return list;
+}
+
+export function addService(name: string, defaultPrice: number | null): ServiceItem {
+  const item: ServiceItem = {
+    id: `svc-${Date.now().toString(36)}`,
+    name: name.trim(),
+    defaultPrice: defaultPrice !== null && Number.isFinite(defaultPrice) ? Math.round(defaultPrice) : null,
+  };
+  const all = getServices();
+  all.push(item);
+  save(KEYS.services, all);
+  return item;
+}
+
+export function removeService(id: string): void {
+  save(
+    KEYS.services,
+    getServices().filter((s) => s.id !== id),
+  );
+}
+
+/** Аналитика: доход по услугам (группировка по receipt.service). */
+export function revenueByService(): { service: string; total: number; count: number }[] {
+  const map = new Map<string, { total: number; count: number }>();
+  for (const r of getReceipts()) {
+    const key = r.service.trim() || 'Без названия';
+    const cur = map.get(key) ?? { total: 0, count: 0 };
+    cur.total += r.amount;
+    cur.count += 1;
+    map.set(key, cur);
+  }
+  return [...map.entries()]
+    .map(([service, v]) => ({ service, ...v }))
+    .sort((a, b) => b.total - a.total);
+}
+
+/** Доход по услугам за последние 6 месяцев — для графика. */
+export function monthlyByService(months = 6): { label: string; byService: Record<string, number> }[] {
+  const now = new Date();
+  const result: { label: string; byService: Record<string, number> }[] = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const byService: Record<string, number> = {};
+    for (const r of getReceipts().filter((x) => x.date.startsWith(key))) {
+      const k = r.service.trim() || 'Без названия';
+      byService[k] = (byService[k] ?? 0) + r.amount;
+    }
+    result.push({ label: d.toLocaleDateString('ru-RU', { month: 'short' }), byService });
+  }
+  return result;
+}
+
 // ---------- Оплата по QR ----------
 //
-// Два режима QR:
-// 1. «Настоящий» (sbp): самозанятый вставляет SBP-строку/QR из своего банка
-//    (статический QR для приёма переводов). Клиент сканирует — открывается банк.
-//    Динамические суммы в SBP без регистрации мерчанта невозможны — это задача бэкенда.
-// 2. «Визитка» (details): QR с реквизитами и суммой текстом. Клиент сканирует,
-//    копирует данные в свой банк и платит. Работает всегда, но в два касания.
+// Основной режим — «визитка» без банков: QR содержит реквизиты, сумму и услугу текстом.
+// Клиент сканирует, видит данные и переводит по СБП по номеру телефона вручную (сумму вводит сам).
+// Расширенный режим (опционально): если вставлена SBP-строка или фото QR из банка — показываем банковский QR.
 
 export interface PayProfile {
   payee: string; // имя/название для счёта
@@ -309,6 +382,7 @@ export interface PayProfile {
 export interface Invoice {
   id: string;
   client: string;
+  service?: string;
   amount: number;
   receiptId?: string;
   receiptNumber?: number;
@@ -340,17 +414,25 @@ export function savePayProfile(p: PayProfile): void {
   });
 }
 
-/** Строит текст QR по текущему профилю. Настоящий SBP — только если вставлена строка из банка. */
-export function buildQr(profile: PayProfile, client: string, amount: number): { kind: 'sbp' | 'details'; text: string } {
+/** Строит текст QR-визитки. Сумма указывается, но клиент вводит её вручную в своём банке. */
+export function buildQr(
+  profile: PayProfile,
+  client: string,
+  amount: number,
+  service?: string,
+): { kind: 'sbp' | 'details'; text: string } {
+  // Если есть банковская SBP-строка — используем её как есть (расширенный режим)
   if (profile.sbpPayload) return { kind: 'sbp', text: profile.sbpPayload };
   const lines = [
     'PROFISTATUS-PAY',
     `Получатель: ${profile.payee || '—'}`,
     `Сумма: ${fmtMoney(amount)}`,
+    service ? `Услуга: ${service}` : '',
     `Клиент: ${client}`,
     profile.phone ? `Телефон (СБП): ${profile.phone}` : '',
     profile.bank ? `Банк: ${profile.bank}` : '',
     profile.card ? `Карта: ${profile.card}` : '',
+    'Инструкция: откройте свой банк -> СБП по номеру телефона -> введите телефон и сумму',
   ].filter(Boolean);
   return { kind: 'details', text: lines.join('\n') };
 }
@@ -362,6 +444,7 @@ export function getInvoices(): Invoice[] {
 export interface InvoiceInput {
   client: string;
   amount: number;
+  service?: string;
   receiptId?: string;
   receiptNumber?: number;
 }
@@ -370,20 +453,26 @@ export function validateInvoice(input: InvoiceInput): string[] {
   const errors: string[] = [];
   if (!input.client.trim()) errors.push('Укажите клиента.');
   if (!Number.isFinite(input.amount) || input.amount <= 0) errors.push('Сумма должна быть больше нуля.');
-  const p = getPayProfile();
-  if (!p.phone && !p.card && !p.sbpPayload && !p.qrImage)
-    errors.push('Заполните реквизиты (телефон, карту, SBP-строку или фото QR) — иначе клиенту некуда платить.');
+  // Реквизиты теперь опциональны: QR-визитка сработает и без банков, клиент уточнит перевод голосом/мессенджером.
   return errors;
+}
+
+/** Текст-подсказка если реквизиты пустые — показываем как предупреждение, а не ошибку. */
+export function invoiceWarning(): string | null {
+  const p = getPayProfile();
+  if (!p.phone && !p.card) return 'Подсказка: заполните телефон для СБП в реквизитах — клиенту будет проще оплатить.';
+  return null;
 }
 
 export function addInvoice(input: InvoiceInput): Invoice {
   const p = getPayProfile();
-  // Приоритет: настоящая SBP-строка > фото QR из банка > текстовая визитка
+  // Банковский QR — опционально, по умолчанию — визитка без банков
   const kind: Invoice['qrKind'] = p.sbpPayload ? 'sbp' : p.qrImage ? 'image' : 'details';
-  const qr = buildQr(p, input.client.trim(), Math.round(input.amount));
+  const qr = buildQr(p, input.client.trim(), Math.round(input.amount), input.service);
   const inv: Invoice = {
     id: `inv-${Date.now().toString(36)}`,
     client: input.client.trim(),
+    service: input.service?.trim() || '',
     amount: Math.round(input.amount),
     receiptId: input.receiptId,
     receiptNumber: input.receiptNumber,
