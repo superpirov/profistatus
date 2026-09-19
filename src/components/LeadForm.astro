@@ -1,6 +1,7 @@
 ---
 // Форма сбора лидов через Formspree (п. 3.3 ТЗ).
 // Работает без бэкенда; при отсутствии ключа — mock-режим (см. leadService).
+import { link } from '@/lib/site';
 interface Props {
   segment?: 'freelancer' | 'business' | 'feedback';
   title?: string;
@@ -27,7 +28,7 @@ const { segment = 'freelancer', title = 'Оставьте заявку' } = Astr
       Отправить заявку
     </button>
     <p data-form-status role="status" class="text-sm text-slate-600" aria-live="polite"></p>
-    <p class="text-xs text-slate-500">Нажимая кнопку, вы соглашаетесь с <a class="underline" href={`${import.meta.env.BASE_URL}legal`}>политикой конфиденциальности</a>.</p>
+    <p class="text-xs text-slate-500">Нажимая кнопку, вы соглашаетесь с <a class="underline" href={link('legal')}>политикой конфиденциальности</a>.</p>
   </form>
 </section>
 

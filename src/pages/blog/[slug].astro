@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
+import { link } from '@/lib/site';
 
 // Статический пререндер 3 демо-статей (SSG). При росте — вынести в content collections.
 export function getStaticPaths() {
@@ -15,6 +16,6 @@ const { slug } = Astro.params;
   <article class="mx-auto max-w-3xl px-4 pt-10">
     <h1 class="text-3xl font-bold">Статья: {slug}</h1>
     <p class="mt-4 text-slate-600 text-sm">SEO-контент MVP: полный текст появится после запуска. Сейчас страница-заглушка подтверждает маршрутизацию и canonical URL.</p>
-    <p class="mt-4 text-sm">Вернуться к <a class="underline" href={`${import.meta.env.BASE_URL}blog`}>списку статей</a>.</p>
+    <p class="mt-4 text-sm">Вернуться к <a class="underline" href={link('blog')}>списку статей</a>.</p>
   </article>
 </BaseLayout>

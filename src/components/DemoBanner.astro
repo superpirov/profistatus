@@ -1,10 +1,10 @@
 ---
 // Баннер демо-режима (п. 3.2 ТЗ): обязателен на всех /demo/* экранах.
-const base = import.meta.env.BASE_URL;
+import { basePath } from '@/lib/site';
 ---
 <div role="note" aria-label="Демонстрационная версия" class="bg-amber-100 border-b border-amber-300 text-amber-900">
   <div class="mx-auto max-w-6xl px-4 py-2 text-sm flex flex-wrap items-center gap-2 justify-between">
     <p><strong>Это демонстрационная версия.</strong> Реальный сервис запускается скоро. Данные вымышлены.</p>
-    <a href={`${base}#lead-form`} class="underline font-medium">Оставить отзыв о прототипе</a>
+    <a href={`${basePath}#lead-form`} class="underline font-medium">Оставить отзыв о прототипе</a>
   </div>
 </div>

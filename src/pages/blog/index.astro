@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
-const base = import.meta.env.BASE_URL;
+import { link } from '@/lib/site';
 const posts = [
   { slug: 'samozanyatost-2026', title: 'Самозанятость в 2026: лимиты и ставки', excerpt: 'Разбираем актуальные лимиты дохода, ставки 4%/6% и частые ошибки.' },
   { slug: 'dogovor-s-samozanyatym', title: 'Договор с самозанятым без риска', excerpt: 'Какие пункты спасут от переквалификации и штрафов.' },
@@ -12,7 +12,7 @@ const posts = [
     <h1 class="text-3xl font-bold">Блог и кейсы</h1>
     <div class="mt-6 grid gap-3">
       {posts.map((p) => (
-        <a href={`${base}blog/${p.slug}`} class="rounded-xl border bg-white p-4 hover:shadow-sm">
+        <a href={link(`blog/${p.slug}`)} class="rounded-xl border bg-white p-4 hover:shadow-sm">
           <h2 class="font-semibold">{p.title}</h2>
           <p class="mt-1 text-sm text-slate-600">{p.excerpt}</p>
         </a>

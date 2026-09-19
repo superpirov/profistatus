@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
 import { env } from '@/lib/env';
+import { basePath, canonicalUrl, link } from '@/lib/site';
 
 interface Props {
   title: string;
@@ -9,9 +10,8 @@ interface Props {
 }
 
 const { title, description, path = '/' } = Astro.props;
-// import.meta.env.BASE_URL уже включает /profistatus на проде
-const base = import.meta.env.BASE_URL;
-const canonical = `${env.siteUrl}${path}`;
+// Все ссылки строим через link()/canonicalUrl() — BASE_URL без слэша даёт 404 (см. src/lib/site.ts)
+const canonical = canonicalUrl(path);
 ---
 <!doctype html>
 <html lang="ru">
@@ -25,7 +25,7 @@ const canonical = `${env.siteUrl}${path}`;
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
     <meta property="og:url" content={canonical} />
-    <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
+    <link rel="icon" type="image/svg+xml" href={link('favicon.svg')} />
     <!-- Яндекс.Метрика и PostHog подключаются только при заданных ключах (см. .env.example) -->
     {env.yandexMetricaId && (
       <script is:inline define:vars={{ id: env.yandexMetricaId }}>
@@ -39,12 +39,12 @@ const canonical = `${env.siteUrl}${path}`;
     </a>
     <header class="border-b bg-white/80 backdrop-blur sticky top-0 z-40">
       <nav class="mx-auto max-w-6xl flex items-center gap-4 px-4 py-3" aria-label="Основная навигация">
-        <a href={`${base}`} class="font-bold text-lg text-indigo-700">ProfiStatus</a>
-        <a href={`${base}freelancers`} class="hidden sm:inline text-sm hover:underline">Исполнителям</a>
-        <a href={`${base}business`} class="hidden sm:inline text-sm hover:underline">Бизнесу</a>
-        <a href={`${base}how-it-works`} class="hidden sm:inline text-sm hover:underline">Как это работает</a>
-        <a href={`${base}blog`} class="hidden sm:inline text-sm hover:underline">Блог</a>
-        <a href={`${base}demo/freelancer`} class="ml-auto text-sm rounded-lg bg-indigo-600 px-3 py-2 text-white hover:bg-indigo-700">
+        <a href={basePath} class="font-bold text-lg text-indigo-700">ProfiStatus</a>
+        <a href={link('freelancers')} class="hidden sm:inline text-sm hover:underline">Исполнителям</a>
+        <a href={link('business')} class="hidden sm:inline text-sm hover:underline">Бизнесу</a>
+        <a href={link('how-it-works')} class="hidden sm:inline text-sm hover:underline">Как это работает</a>
+        <a href={link('blog')} class="hidden sm:inline text-sm hover:underline">Блог</a>
+        <a href={link('demo/freelancer')} class="ml-auto text-sm rounded-lg bg-indigo-600 px-3 py-2 text-white hover:bg-indigo-700">
           Демо-кабинет
         </a>
       </nav>
@@ -54,8 +54,8 @@ const canonical = `${env.siteUrl}${path}`;
       <div class="mx-auto max-w-6xl px-4 py-8 text-sm text-slate-600 flex flex-col sm:flex-row gap-4 justify-between">
         <p>© 2026 ProfiStatus · MVP-прототип для валидации спроса</p>
         <nav class="flex gap-4" aria-label="Нижняя навигация">
-          <a href={`${base}legal`} class="hover:underline">Правовая информация</a>
-          <a href={`${base}blog`} class="hover:underline">Блог</a>
+          <a href={link('legal')} class="hover:underline">Правовая информация</a>
+          <a href={link('blog')} class="hover:underline">Блог</a>
         </nav>
       </div>
     </footer>

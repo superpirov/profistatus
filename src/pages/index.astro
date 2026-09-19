@@ -2,7 +2,7 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import LeadForm from '@/components/LeadForm.astro';
 import Calculator from '@/components/Calculator.astro';
-const base = import.meta.env.BASE_URL;
+import { link } from '@/lib/site';
 ---
 <BaseLayout title="Легализация самозанятых без боли" description="ProfiStatus помогает исполнителям и бизнесу работать легально: чеки, договоры, безопасные сделки.">
   <section class="mx-auto max-w-6xl px-4 pt-12 grid gap-8 md:grid-cols-2 items-start">
@@ -11,8 +11,8 @@ const base = import.meta.env.BASE_URL;
       <h1 class="text-4xl font-bold leading-tight" data-ab="hero-title-a">Работайте легально как самозанятый — за 10 минут</h1>
       <p class="mt-4 text-lg text-slate-600">Чеки, договоры и выплаты от юрлиц без страха блокировок. Для исполнителей и бизнеса.</p>
       <div class="mt-6 flex flex-wrap gap-3">
-        <a href={`${base}freelancers`} class="rounded-lg bg-indigo-600 px-5 py-3 text-white font-medium">Я исполнитель</a>
-        <a href={`${base}business`} class="rounded-lg border px-5 py-3 font-medium bg-white">Я бизнес</a>
+        <a href={link('freelancers')} class="rounded-lg bg-indigo-600 px-5 py-3 text-white font-medium">Я исполнитель</a>
+        <a href={link('business')} class="rounded-lg border px-5 py-3 font-medium bg-white">Я бизнес</a>
       </div>
       <dl class="mt-8 grid grid-cols-3 gap-4 text-sm">
         <div><dt class="text-slate-500">Экономия на налогах</dt><dd class="text-xl font-bold">до 7%</dd></div>
