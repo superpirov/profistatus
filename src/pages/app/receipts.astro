@@ -60,7 +60,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 </BaseLayout>
 
 <script>
-  import { addReceipt, fmtDate, fmtMoney, calcTax, getReceipts, removeReceipt, todayIso, validateReceipt } from '@/lib/store';
+  import { addInvoice, addReceipt, fmtDate, fmtMoney, calcTax, getReceipts, removeReceipt, todayIso, validateReceipt } from '@/lib/store';
   import { track } from '@/lib/analytics';
 
   const service = document.getElementById('f-service');
@@ -97,6 +97,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
       ? all.map((r) => `<li class="rounded-xl border p-3 flex flex-wrap items-center gap-2 justify-between">
           <span><strong>№${r.number}</strong> · ${r.service} · ${r.client} · ${fmtDate(r.date)} · <strong>${fmtMoney(r.amount)}</strong> <span class="text-slate-500">(налог ${fmtMoney(r.tax)})</span></span>
           <span class="flex gap-2">
+            <button data-inv="${r.id}" class="rounded-lg bg-indigo-600 text-white px-3 py-1 hover:bg-indigo-700">QR-счёт</button>
             <button data-print="${r.id}" class="rounded-lg border px-3 py-1 hover:bg-slate-50">Печать</button>
             <button data-dl="${r.id}" class="rounded-lg border px-3 py-1 hover:bg-slate-50">JSON</button>
             <button data-del="${r.id}" class="rounded-lg border px-3 py-1 text-red-700 hover:bg-red-50">Удалить</button>
@@ -149,6 +150,15 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   history.addEventListener('click', (e) => {
     const btn = e.target.closest('button');
     if (!btn) return;
+    if (btn.dataset.inv) {
+      // Счёт с QR по чеку: реквизиты подтянутся из профиля, дальше — на страницу счетов
+      const r = getReceipts().find((x) => x.id === btn.dataset.inv);
+      if (r) {
+        addInvoice({ client: r.client, amount: r.amount, receiptId: r.id, receiptNumber: r.number });
+        track('invoice_created', { amount: r.amount, from: 'receipt' });
+        window.location.href = '../invoices/';
+      }
+    }
     if (btn.dataset.print) printReceipt(btn.dataset.print);
     if (btn.dataset.dl) downloadJson(btn.dataset.dl);
     if (btn.dataset.del) { removeReceipt(btn.dataset.del); renderHistory(); }

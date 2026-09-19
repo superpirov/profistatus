@@ -34,10 +34,14 @@ import { link } from '@/lib/site';
       </section>
     </div>
 
-    <div class="mt-6 grid gap-3 sm:grid-cols-3 text-sm">
+    <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
       <a href={link('app/receipts')} class="rounded-2xl border bg-indigo-600 text-white p-5 hover:bg-indigo-700">
         <strong class="block text-base">🧾 Новый чек</strong>
         <span class="text-indigo-100">Предчек за 1 минуту: налог 4%/6%, печать, экспорт</span>
+      </a>
+      <a href={link('app/invoices')} class="rounded-2xl border bg-white p-5 hover:shadow-sm">
+        <strong class="block text-base">💳 Счёт с QR</strong>
+        <span class="text-slate-600">Клиент сканирует и платит — без переводов вручную</span>
       </a>
       <a href={link('app/orders')} class="rounded-2xl border bg-white p-5 hover:shadow-sm">
         <strong class="block text-base">📋 Биржа заказов</strong>

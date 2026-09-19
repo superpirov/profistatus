@@ -40,6 +40,8 @@ const KEYS = {
   responses: 'profistatus:order-responses:v1', // отклики на чужие/сид-заказы: { [id]: count }
   responded: 'profistatus:order-responded:v1', // на что я уже откликнулся: string[]
   counter: 'profistatus:receipt-counter:v1',
+  profile: 'profistatus:pay-profile:v1', // реквизиты самозанятого для QR-оплаты
+  invoices: 'profistatus:invoices:v1', // выставленные счета с QR
 } as const;
 
 /** Годовой лимит дохода самозанятого по 422-ФЗ, ₽ */
@@ -284,4 +286,134 @@ export function respondToOrder(id: string): boolean {
 
 export function hasResponded(id: string): boolean {
   return load<string[]>(KEYS.responded, []).includes(id);
+}
+
+// ---------- Оплата по QR ----------
+//
+// Два режима QR:
+// 1. «Настоящий» (sbp): самозанятый вставляет SBP-строку/QR из своего банка
+//    (статический QR для приёма переводов). Клиент сканирует — открывается банк.
+//    Динамические суммы в SBP без регистрации мерчанта невозможны — это задача бэкенда.
+// 2. «Визитка» (details): QR с реквизитами и суммой текстом. Клиент сканирует,
+//    копирует данные в свой банк и платит. Работает всегда, но в два касания.
+
+export interface PayProfile {
+  payee: string; // имя/название для счёта
+  phone: string; // телефон для СБП-перевода
+  bank: string; // банк получателя
+  card: string; // номер карты (необязательно)
+  sbpPayload: string; // SBP-строка из банка для настоящей оплаты (необязательно)
+}
+
+export interface Invoice {
+  id: string;
+  client: string;
+  amount: number;
+  receiptId?: string;
+  receiptNumber?: number;
+  // Снапшот реквизитов на момент выставления — счёт не меняется при смене профиля
+  payee: string;
+  phone: string;
+  bank: string;
+  card: string;
+  qrKind: 'sbp' | 'details';
+  qrText: string; // что именно закодировано в QR
+  status: 'unpaid' | 'paid';
+  createdAt: string; // ISO
+  paidAt?: string; // ISO
+}
+
+export function getPayProfile(): PayProfile {
+  return load<PayProfile>(KEYS.profile, { payee: '', phone: '', bank: '', card: '', sbpPayload: '' });
+}
+
+export function savePayProfile(p: PayProfile): void {
+  save(KEYS.profile, {
+    payee: p.payee.trim(),
+    phone: p.phone.trim(),
+    bank: p.bank.trim(),
+    card: p.card.trim(),
+    sbpPayload: p.sbpPayload.trim(),
+  });
+}
+
+/** Строит текст QR по текущему профилю. Настоящий SBP — только если вставлена строка из банка. */
+export function buildQr(profile: PayProfile, client: string, amount: number): { kind: 'sbp' | 'details'; text: string } {
+  if (profile.sbpPayload) return { kind: 'sbp', text: profile.sbpPayload };
+  const lines = [
+    'PROFISTATUS-PAY',
+    `Получатель: ${profile.payee || '—'}`,
+    `Сумма: ${fmtMoney(amount)}`,
+    `Клиент: ${client}`,
+    profile.phone ? `Телефон (СБП): ${profile.phone}` : '',
+    profile.bank ? `Банк: ${profile.bank}` : '',
+    profile.card ? `Карта: ${profile.card}` : '',
+  ].filter(Boolean);
+  return { kind: 'details', text: lines.join('\n') };
+}
+
+export function getInvoices(): Invoice[] {
+  return load<Invoice[]>(KEYS.invoices, []).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export interface InvoiceInput {
+  client: string;
+  amount: number;
+  receiptId?: string;
+  receiptNumber?: number;
+}
+
+export function validateInvoice(input: InvoiceInput): string[] {
+  const errors: string[] = [];
+  if (!input.client.trim()) errors.push('Укажите клиента.');
+  if (!Number.isFinite(input.amount) || input.amount <= 0) errors.push('Сумма должна быть больше нуля.');
+  const p = getPayProfile();
+  if (!p.phone && !p.card && !p.sbpPayload)
+    errors.push('Заполните реквизиты (телефон, карту или SBP-строку) — иначе клиенту некуда платить.');
+  return errors;
+}
+
+export function addInvoice(input: InvoiceInput): Invoice {
+  const p = getPayProfile();
+  const qr = buildQr(p, input.client.trim(), Math.round(input.amount));
+  const inv: Invoice = {
+    id: `inv-${Date.now().toString(36)}`,
+    client: input.client.trim(),
+    amount: Math.round(input.amount),
+    receiptId: input.receiptId,
+    receiptNumber: input.receiptNumber,
+    payee: p.payee.trim(),
+    phone: p.phone.trim(),
+    bank: p.bank.trim(),
+    card: p.card.trim(),
+    qrKind: qr.kind,
+    qrText: qr.text,
+    status: 'unpaid',
+    createdAt: new Date().toISOString(),
+  };
+  const all = getInvoices();
+  all.push(inv);
+  save(KEYS.invoices, all);
+  return inv;
+}
+
+/** Отметка об оплате — вручную (подтверждение от банка придёт с бэкендом/эквайрингом). */
+export function markInvoicePaid(id: string): void {
+  const all = getInvoices().map((inv) =>
+    inv.id === id ? { ...inv, status: 'paid' as const, paidAt: new Date().toISOString() } : inv,
+  );
+  save(KEYS.invoices, all);
+}
+
+export function removeInvoice(id: string): void {
+  save(
+    KEYS.invoices,
+    getInvoices().filter((inv) => inv.id !== id),
+  );
+}
+
+export function unpaidTotal(): number {
+  return getInvoices()
+    .filter((inv) => inv.status === 'unpaid')
+    .reduce((s, inv) => s + inv.amount, 0);
 }

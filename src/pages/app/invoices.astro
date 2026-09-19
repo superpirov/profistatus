@@ -1,0 +1,162 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+---
+<BaseLayout title="Счета с QR" description="Выставляйте счета с QR-кодом: клиент сканирует и платит." path="/app/invoices">
+  <div class="mx-auto max-w-6xl px-4 pt-8">
+    <h1 class="text-3xl font-bold">Счета с QR</h1>
+    <p class="mt-1 text-sm text-slate-600">
+      Покажите QR клиенту с экрана или распечатайте счёт — не нужно диктовать номер карты.
+      Настоящая one-tap оплата работает, если вставить SBP-строку из вашего банка;
+      иначе QR содержит реквизиты для копирования. Автоподтверждение оплаты — с бэкендом.
+    </p>
+
+    <div class="mt-4 grid gap-3 sm:grid-cols-3 text-sm">
+      <div class="rounded-xl border bg-white p-4"><p class="text-slate-500">Ждут оплаты</p><p class="text-2xl font-bold" id="inv-count">—</p></div>
+      <div class="rounded-xl border bg-white p-4"><p class="text-slate-500">Сумма к получению</p><p class="text-2xl font-bold" id="inv-total">—</p></div>
+      <div class="rounded-xl border bg-white p-4"><p class="text-slate-500">Оплачено всего</p><p class="text-2xl font-bold" id="inv-paid">—</p></div>
+    </div>
+
+    <div class="mt-6 grid gap-6 md:grid-cols-[320px_1fr] items-start">
+      <div class="grid gap-6">
+        <form id="profile-form" class="rounded-2xl border bg-white p-5 grid gap-3 text-sm" novalidate>
+          <h2 class="font-semibold text-base">Мои реквизиты</h2>
+          <label class="grid gap-1">Имя / название для счёта
+            <input id="p-payee" class="rounded-lg border px-3 py-2" placeholder="Иван Петров" />
+          </label>
+          <label class="grid gap-1">Телефон для СБП-перевода
+            <input id="p-phone" type="tel" class="rounded-lg border px-3 py-2" placeholder="+7 ___ ___-__-__" />
+          </label>
+          <label class="grid gap-1">Банк
+            <input id="p-bank" class="rounded-lg border px-3 py-2" placeholder="Например: Сбер, Тинькофф" />
+          </label>
+          <label class="grid gap-1">Карта (необязательно)
+            <input id="p-card" inputmode="numeric" class="rounded-lg border px-3 py-2" placeholder="0000 0000 0000 0000" />
+          </label>
+          <label class="grid gap-1">SBP-строка из банка (для настоящей оплаты)
+            <textarea id="p-sbp" rows="2" class="rounded-lg border px-3 py-2" placeholder="Вставьте payload статического QR из приложения банка"></textarea>
+          </label>
+          <button class="rounded-lg bg-slate-900 px-4 py-2 text-white font-medium hover:bg-slate-700">Сохранить реквизиты</button>
+          <p id="p-status" class="text-slate-600" role="status" aria-live="polite"></p>
+        </form>
+
+        <form id="invoice-form" class="rounded-2xl border bg-white p-5 grid gap-3 text-sm" novalidate>
+          <h2 class="font-semibold text-base">Новый счёт</h2>
+          <label class="grid gap-1">Клиент
+            <input id="i-client" class="rounded-lg border px-3 py-2" placeholder="Кто платит" />
+          </label>
+          <label class="grid gap-1">Сумма, ₽
+            <input id="i-amount" type="number" min="1" class="rounded-lg border px-3 py-2" placeholder="5000" />
+          </label>
+          <ul id="i-errors" class="text-red-700 grid gap-1" aria-live="polite"></ul>
+          <button class="rounded-lg bg-indigo-600 px-4 py-2.5 text-white font-medium hover:bg-indigo-700">Выставить счёт с QR</button>
+        </form>
+      </div>
+
+      <section class="rounded-2xl border bg-white p-5" aria-label="Выставленные счета">
+        <h2 class="font-semibold text-base">Выставленные счета</h2>
+        <ul id="inv-list" class="mt-3 grid gap-3 text-sm"></ul>
+      </section>
+    </div>
+  </div>
+
+  <div id="print-root" class="print-area" aria-hidden="true"></div>
+</BaseLayout>
+
+<script>
+  import QRCode from 'qrcode';
+  import {
+    addInvoice, fmtMoney, getInvoices, getPayProfile, markInvoicePaid,
+    removeInvoice, savePayProfile, unpaidTotal, validateInvoice,
+  } from '@/lib/store';
+  import { track } from '@/lib/analytics';
+
+  // --- Профиль ---
+  const p = getPayProfile();
+  const payee = document.getElementById('p-payee');
+  const phone = document.getElementById('p-phone');
+  const bank = document.getElementById('p-bank');
+  const card = document.getElementById('p-card');
+  const sbp = document.getElementById('p-sbp');
+  payee.value = p.payee; phone.value = p.phone; bank.value = p.bank; card.value = p.card; sbp.value = p.sbpPayload;
+
+  document.getElementById('profile-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    savePayProfile({ payee: payee.value ?? '', phone: phone.value ?? '', bank: bank.value ?? '', card: card.value ?? '', sbpPayload: sbp.value ?? '' });
+    document.getElementById('p-status').textContent = 'Реквизиты сохранены в этом браузере.';
+  });
+
+  // --- Счета ---
+  const list = document.getElementById('inv-list');
+
+  async function render() {
+    const all = getInvoices();
+    document.getElementById('inv-count').textContent = String(all.filter((i) => i.status === 'unpaid').length);
+    document.getElementById('inv-total').textContent = fmtMoney(unpaidTotal());
+    document.getElementById('inv-paid').textContent = fmtMoney(all.filter((i) => i.status === 'paid').reduce((s, i) => s + i.amount, 0));
+
+    list.innerHTML = all.length
+      ? all.map((inv) => `<li class="rounded-xl border p-4 grid sm:grid-cols-[150px_1fr] gap-4">
+          <div>
+            <img data-qr="${inv.id}" alt="QR-код для оплаты счёта на ${fmtMoney(inv.amount)}" class="w-[150px] h-[150px] border rounded-lg bg-white" />
+            <p class="mt-1 text-xs ${inv.qrKind === 'sbp' ? 'text-green-700' : 'text-slate-500'}">${inv.qrKind === 'sbp' ? 'QR из банка: сканируйте для оплаты' : 'QR-визитка: реквизиты для копирования'}</p>
+          </div>
+          <div>
+            <p><strong>${fmtMoney(inv.amount)}</strong> · ${inv.client} ${inv.status === 'paid' ? '<span class="text-xs font-normal text-green-700 bg-green-50 rounded px-2 py-0.5">оплачен</span>' : '<span class="text-xs font-normal text-amber-700 bg-amber-100 rounded px-2 py-0.5">ждёт оплаты</span>'}</p>
+            ${inv.receiptNumber ? `<p class="text-slate-600">По предчеку №${inv.receiptNumber}</p>` : ''}
+            <p class="text-slate-600">Получатель: ${inv.payee || '—'}${inv.phone ? ` · СБП: ${inv.phone}` : ''}${inv.bank ? ` · ${inv.bank}` : ''}</p>
+            <div class="mt-2 flex flex-wrap gap-2">
+              ${inv.status === 'unpaid' ? `<button data-paid="${inv.id}" class="rounded-lg bg-green-600 text-white px-3 py-1 hover:bg-green-700">Отметить оплаченным</button>` : ''}
+              <button data-print="${inv.id}" class="rounded-lg border px-3 py-1 hover:bg-slate-50">Печать счёта</button>
+              <button data-del="${inv.id}" class="rounded-lg border px-3 py-1 text-red-700 hover:bg-red-50">Удалить</button>
+            </div>
+          </div></li>`).join('')
+      : '<li class="text-slate-500">Счетов пока нет.</li>';
+
+    // Генерируем QR-картинки (клиентская библиотека qrcode, без сервера)
+    for (const inv of all) {
+      const img = list.querySelector(`img[data-qr="${inv.id}"]`);
+      if (img) img.src = await QRCode.toDataURL(inv.qrText, { width: 300, margin: 1 });
+    }
+  }
+
+  document.getElementById('invoice-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = {
+      client: document.getElementById('i-client').value ?? '',
+      amount: Number(document.getElementById('i-amount').value),
+    };
+    const errors = validateInvoice(input);
+    document.getElementById('i-errors').innerHTML = errors.map((x) => `<li>• ${x}</li>`).join('');
+    if (errors.length) return;
+    addInvoice(input);
+    track('invoice_created', { amount: input.amount });
+    e.target.reset();
+    render();
+  });
+
+  function printInvoice(id) {
+    const inv = getInvoices().find((x) => x.id === id);
+    if (!inv) return;
+    const img = list.querySelector(`img[data-qr="${inv.id}"]`);
+    const src = img?.src ?? '';
+    document.getElementById('print-root').innerHTML = `
+      <h1>Счёт на ${fmtMoney(inv.amount)}</h1>
+      <p>ProfiStatus · клиент: ${inv.client}${inv.receiptNumber ? ` · предчек №${inv.receiptNumber}` : ''}</p>
+      <p>Получатель: ${inv.payee || '—'}${inv.phone ? ` · СБП: ${inv.phone}` : ''}${inv.bank ? ` · ${inv.bank}` : ''}${inv.card ? ` · карта ${inv.card}` : ''}</p>
+      ${src ? `<img src="${src}" style="width:220px;height:220px" />` : ''}
+      <p>Отсканируйте QR для оплаты. ${inv.qrKind === 'sbp' ? '' : 'QR содержит реквизиты: скопируйте их в приложение банка.'}</p>`;
+    document.body.classList.add('printing');
+    window.print();
+  }
+
+  list.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    if (btn.dataset.paid) { markInvoicePaid(btn.dataset.paid); render(); }
+    if (btn.dataset.print) printInvoice(btn.dataset.print);
+    if (btn.dataset.del) { removeInvoice(btn.dataset.del); render(); }
+  });
+  window.addEventListener('afterprint', () => document.body.classList.remove('printing'));
+
+  render();
+</script>

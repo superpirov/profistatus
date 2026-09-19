@@ -13,6 +13,8 @@
 
 - **Лид**: `LeadForm.astro` → `submitLead()` → `POST Formspree` (или mock-лог).
 - **Чеки**: `app/receipts` → `store.ts` (валидация, нумерация, налог 4%/6%, localStorage) → история/печать/JSON.
+- **Счета с QR**: `app/invoices` → `store.ts` (профиль реквизитов, снапшот в счёте) → QR генерируется
+  клиентской библиотекой `qrcode`; настоящий SBP-QR — только из вставленной строки банка.
 - **Заказы**: `app/orders` → `store.ts` (сид `orders.json` + публикации пользователя) → фильтры/отклики.
 - **Дашборд**: `app/index` → агрегация `store.ts` (доход, налог, график SVG).
 - **Аналитика**: `track(event)` → PostHog / Метрика / console (graceful degradation).
