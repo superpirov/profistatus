@@ -1,0 +1,124 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { ORDER_CATEGORIES } from '@/lib/store';
+---
+<BaseLayout title="Биржа заказов" description="Заказы от бизнеса: фильтры, публикация, отклики." path="/app/orders">
+  <div class="mx-auto max-w-6xl px-4 pt-8">
+    <h1 class="text-3xl font-bold">Биржа заказов</h1>
+    <p class="mt-1 text-sm text-slate-600">
+      Витрина + ваши публикации хранятся в браузере. Общая лента между пользователями
+      и уведомления об откликах появятся с бэкендом.
+    </p>
+
+    <div class="mt-6 grid gap-6 md:grid-cols-[1fr_320px] items-start">
+      <section aria-label="Список заказов">
+        <div class="flex flex-wrap gap-2 text-sm">
+          <input id="q" class="rounded-lg border px-3 py-2 grow" placeholder="Поиск: текст, город…" />
+          <select id="cat" class="rounded-lg border px-3 py-2">
+            <option value="">Все категории</option>
+            {ORDER_CATEGORIES.map((c) => <option value={c}>{c}</option>)}
+          </select>
+        </div>
+        <p id="count" class="mt-2 text-sm text-slate-500" role="status"></p>
+        <ul id="list" class="mt-3 grid gap-2 text-sm"></ul>
+      </section>
+
+      <form id="order-form" class="rounded-2xl border bg-white p-5 grid gap-3 text-sm" novalidate>
+        <h2 class="font-semibold text-base">Опубликовать заказ</h2>
+        <label class="grid gap-1">Название задачи
+          <input id="o-title" class="rounded-lg border px-3 py-2" placeholder="Например: лендинг для кофейни" />
+        </label>
+        <label class="grid gap-1">Категория
+          <select id="o-cat" class="rounded-lg border px-3 py-2">
+            <option value="">— выберите —</option>
+            {ORDER_CATEGORIES.map((c) => <option value={c}>{c}</option>)}
+          </select>
+        </label>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="grid gap-1">Бюджет, ₽
+            <input id="o-budget" type="number" min="1" class="rounded-lg border px-3 py-2" placeholder="15000" />
+          </label>
+          <label class="grid gap-1">Город
+            <input id="o-city" class="rounded-lg border px-3 py-2" placeholder="Удалённо" />
+          </label>
+        </div>
+        <label class="grid gap-1">Описание
+          <textarea id="o-desc" rows="3" class="rounded-lg border px-3 py-2" placeholder="Что нужно сделать, сроки, требования"></textarea>
+        </label>
+        <label class="grid gap-1">Контакт для связи
+          <input id="o-contact" class="rounded-lg border px-3 py-2" placeholder="Telegram или телефон" />
+        </label>
+        <ul id="o-errors" class="text-red-700 grid gap-1" aria-live="polite"></ul>
+        <button class="rounded-lg bg-indigo-600 px-4 py-2.5 text-white font-medium hover:bg-indigo-700">Опубликовать</button>
+      </form>
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  import { addOrder, fmtDate, fmtMoney, getOrders, hasResponded, removeOrder, respondToOrder, validateOrder } from '@/lib/store';
+  import { track } from '@/lib/analytics';
+
+  const q = document.getElementById('q');
+  const cat = document.getElementById('cat');
+  const list = document.getElementById('list');
+  const count = document.getElementById('count');
+
+  function render() {
+    const query = (q.value ?? '').toLowerCase().trim();
+    const category = cat.value ?? '';
+    const all = getOrders().filter((o) =>
+      (!category || o.category === category) &&
+      (!query || `${o.title} ${o.description} ${o.city} ${o.category}`.toLowerCase().includes(query)),
+    );
+    count.textContent = `Найдено заказов: ${all.length}`;
+    list.innerHTML = all.map((o) => {
+      const responded = hasResponded(o.id);
+      const action = o.mine
+        ? `<button data-del="${o.id}" class="rounded-lg border px-3 py-1 text-red-700 hover:bg-red-50">Снять с публикации</button>`
+        : responded
+          ? `<span class="text-green-700 font-medium">✓ Вы откликнулись</span>`
+          : `<button data-resp="${o.id}" class="rounded-lg bg-indigo-600 text-white px-3 py-1 hover:bg-indigo-700">Откликнуться</button>`;
+      return `<li class="rounded-xl border bg-white p-4">
+        <div class="flex flex-wrap justify-between gap-2"><strong>${o.title} ${o.mine ? '<span class="text-xs font-normal text-indigo-700 bg-indigo-50 rounded px-2 py-0.5">мой</span>' : ''}</strong><span><strong>${fmtMoney(o.budget)}</strong></span></div>
+        <p class="text-slate-600">${o.category} · ${o.city} · ${fmtDate(o.postedAt)} · откликов: ${o.responses}</p>
+        <p class="mt-1">${o.description}</p>
+        ${o.mine && o.contact ? `<p class="mt-1 text-slate-600">Контакт: ${o.contact}</p>` : ''}
+        <div class="mt-2">${action}</div></li>`;
+    }).join('') || '<li class="text-slate-500">Ничего не найдено — измените фильтры или опубликуйте заказ.</li>';
+  }
+
+  q.addEventListener('input', render);
+  cat.addEventListener('change', render);
+
+  list.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    if (btn.dataset.resp) {
+      if (respondToOrder(btn.dataset.resp)) track('order_response', { id: btn.dataset.resp });
+      render();
+    }
+    if (btn.dataset.del) { removeOrder(btn.dataset.del); render(); }
+  });
+
+  document.getElementById('order-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = {
+      title: document.getElementById('o-title').value ?? '',
+      category: document.getElementById('o-cat').value ?? '',
+      budget: Number(document.getElementById('o-budget').value),
+      city: document.getElementById('o-city').value ?? '',
+      description: document.getElementById('o-desc').value ?? '',
+      contact: document.getElementById('o-contact').value ?? '',
+    };
+    const errors = validateOrder(input);
+    document.getElementById('o-errors').innerHTML = errors.map((x) => `<li>• ${x}</li>`).join('');
+    if (errors.length) return;
+    addOrder(input);
+    track('order_published', { category: input.category });
+    e.target.reset();
+    render();
+  });
+
+  render();
+</script>

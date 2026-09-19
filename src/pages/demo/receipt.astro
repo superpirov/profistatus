@@ -1,39 +1,16 @@
 ---
-import BaseLayout from '@/layouts/BaseLayout.astro';
-import DemoBanner from '@/components/DemoBanner.astro';
+import { link } from '@/lib/site';
+const target = link('app/receipts/');
 ---
-<BaseLayout title="Демо: генератор чека" description="Демонстрация формы чека с локальным превью." path="/demo/receipt">
-  <DemoBanner />
-  <div class="mx-auto max-w-6xl px-4 pt-8 grid gap-6 md:grid-cols-2">
-    <div>
-      <h1 class="text-3xl font-bold">Генератор чека (демо)</h1>
-      <form id="receipt-form" class="mt-4 grid gap-3 text-sm rounded-2xl border bg-white p-4">
-        <label class="grid gap-1">Услуга<input id="rc-service" class="rounded-lg border px-3 py-2" value="Дизайн лендинга" /></label>
-        <label class="grid gap-1">Клиент<input id="rc-client" class="rounded-lg border px-3 py-2" value="ООО «Вектор»" /></label>
-        <label class="grid gap-1">Сумма, ₽<input id="rc-amount" type="number" class="rounded-lg border px-3 py-2" value="15000" /></label>
-        <p class="text-xs text-slate-500">Реальный чек не формируется — только визуализация.</p>
-      </form>
-    </div>
-    <div class="rounded-2xl border bg-white p-6" aria-live="polite">
-      <h2 class="font-semibold">Превью чека</h2>
-      <p id="rc-preview-service" class="mt-2 text-sm">Дизайн лендинга</p>
-      <p id="rc-preview-client" class="text-sm text-slate-600">ООО «Вектор»</p>
-      <p id="rc-preview-amount" class="mt-2 text-2xl font-bold">15 000 ₽</p>
-      <p class="mt-2 text-xs text-slate-500">Налог 4%: <span id="rc-preview-tax">600 ₽</span></p>
-    </div>
-  </div>
-</BaseLayout>
-
-<script is:inline>
-  const s = document.getElementById('rc-service');
-  const c = document.getElementById('rc-client');
-  const a = document.getElementById('rc-amount');
-  function upd() {
-    document.getElementById('rc-preview-service').textContent = s.value;
-    document.getElementById('rc-preview-client').textContent = c.value;
-    const v = Number(a.value ?? 0);
-    document.getElementById('rc-preview-amount').textContent = v.toLocaleString('ru-RU') + ' ₽';
-    document.getElementById('rc-preview-tax').textContent = Math.round(v * 0.04).toLocaleString('ru-RU') + ' ₽';
-  }
-  [s, c, a].forEach((el) => el?.addEventListener('input', upd));
-</script>
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="refresh" content={`0;url=${target}`} />
+    <link rel="canonical" href={target} />
+    <title>Переезд к чекам — ProfiStatus</title>
+  </head>
+  <body>
+    <p>Раздел переехал к <a href={target}>генератору чеков</a>.</p>
+  </body>
+</html>

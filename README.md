@@ -26,10 +26,23 @@ npm run build          # статика в dist/
 
 ## Структура
 
-- `src/pages/` — `/`, `/freelancers`, `/business`, `/how-it-works`, `/blog`, `/legal`, `/demo/*`
-- `src/components/` — `LeadForm`, `Calculator`, `DemoBanner`
-- `src/lib/` — `repositories.ts` (интерфейсы), `mockRepositories.ts`, `leadService.ts`, `analytics.ts`, `env.ts`
-- `src/data/orders.json` — 12 мок-заказов для витрины
+- `src/pages/` — `/`, `/freelancers`, `/business`, `/how-it-works`, `/blog`, `/legal`
+- `src/pages/app/` — **рабочий кабинет**: дашборд, генератор предчеков, биржа заказов, панель заказчика
+- `src/pages/demo/*` — редиректы старых демо-ссылок на `/app/*`
+- `src/components/` — `LeadForm`, `Calculator`
+- `src/lib/` — `repositories.ts` (интерфейсы), `store.ts` (рабочее хранилище в localStorage),
+  `site.ts` (ссылки с учётом base), `leadService.ts`, `analytics.ts`, `env.ts`
+- `src/data/orders.json` — стартовая витрина биржи (12 заказов)
 - `public/robots.txt`, `public/favicon.svg`
+
+## Кабинет: что работает, а что ждёт данных
+
+Работает локально (localStorage, без бэкенда): предчеки с налогом 4%/6% и контролем
+лимита 2,4 млн ₽, печать и экспорт JSON, публикация заказов, фильтры, отклики,
+дашборд дохода с графиком.
+
+Нужны данные от заказчика (помечено в интерфейсе бейджем «нужен бэкенд»):
+`FORMSPREE_ENDPOINT` для заявок, ИНН/статус самозанятого + API «Мой налог» для
+фискализации, шаблон договора от юриста, платёжная интеграция для безопасной сделки.
 
 См. также: `ARCHITECTURE.md`, `MIGRATION_GUIDE.md`, `ENV_EXAMPLE.md`.

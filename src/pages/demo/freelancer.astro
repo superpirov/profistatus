@@ -1,29 +1,17 @@
 ---
-import BaseLayout from '@/layouts/BaseLayout.astro';
-import DemoBanner from '@/components/DemoBanner.astro';
-import { repositories } from '@/lib/mockRepositories';
-
-// Данные подгружаются через Repository (п. 4.1 ТЗ), а не хардкодом в шаблоне.
-const receipts = await repositories.receipts.list();
-const total = receipts.reduce((s, r) => s + r.amount, 0);
+// Демо-страница переехала в рабочий кабинет: мгновенный редирект для старых ссылок.
+import { link } from '@/lib/site';
+const target = link('app/');
 ---
-<BaseLayout title="Демо: дашборд исполнителя" description="Демонстрация личного кабинета исполнителя." path="/demo/freelancer">
-  <DemoBanner />
-  <div class="mx-auto max-w-6xl px-4 pt-8">
-    <h1 class="text-3xl font-bold">Дашборд исполнителя (демо)</h1>
-    <div class="mt-4 grid gap-3 sm:grid-cols-3 text-sm">
-      <div class="rounded-xl border bg-white p-4"><p class="text-slate-500">Доход, сентябрь</p><p class="text-2xl font-bold">{total.toLocaleString('ru-RU')} ₽</p></div>
-      <div class="rounded-xl border bg-white p-4"><p class="text-slate-500">Чеков</p><p class="text-2xl font-bold">{receipts.length}</p></div>
-      <div class="rounded-xl border bg-white p-4"><p class="text-slate-500">Ожидают оплаты</p><p class="text-2xl font-bold">{receipts.filter(r => r.status === 'pending').length}</p></div>
-    </div>
-    <h2 class="mt-6 text-xl font-semibold">Последние чеки</h2>
-    <ul class="mt-2 grid gap-2 text-sm">
-      {receipts.map((r) => (
-        <li class="rounded-xl border bg-white p-3 flex justify-between">
-          <span>{r.id} · {r.service} · {r.client}</span>
-          <strong>{r.amount.toLocaleString('ru-RU')} ₽ · {r.status === 'paid' ? 'оплачен' : 'ожидает'}</strong>
-        </li>
-      ))}
-    </ul>
-  </div>
-</BaseLayout>
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="refresh" content={`0;url=${target}`} />
+    <link rel="canonical" href={target} />
+    <title>Переезд в кабинет — ProfiStatus</title>
+  </head>
+  <body>
+    <p>Раздел переехал в <a href={target}>рабочий кабинет</a>.</p>
+  </body>
+</html>

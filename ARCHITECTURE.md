@@ -4,27 +4,29 @@
 
 1. **SSG-first**: все страницы пререндерятся в `dist/`. Нет серверного кода.
 2. **Repository-паттерн**: UI зависит от интерфейсов (`src/lib/repositories.ts`),
-   реализация — в `src/lib/mockRepositories.ts`. Замена на HTTP — в одном файле.
+   рабочая реализация — `src/lib/store.ts` на localStorage. Замена на HTTP — в одном файле.
 3. **Изоляция интеграций**: Formspree (`leadService.ts`), аналитика (`analytics.ts`),
-   конфиг (`env.ts`). Компоненты не знают деталей провайдеров.
+   конфиг (`env.ts`), ссылки (`site.ts` — единый `link()` с учётом base). Компоненты не знают деталей провайдеров.
 4. **Env-конфигурация**: все ключи через `import.meta.env`, пример — `.env.example`.
 
 ## Потоки данных
 
 - **Лид**: `LeadForm.astro` → `submitLead()` → `POST Formspree` (или mock-лог).
-- **Заказы**: `demo/orders` → `repositories.orders.list()` → `orders.json`.
-- **Чеки**: `demo/freelancer` → `repositories.receipts.list()` → мок-массив.
+- **Чеки**: `app/receipts` → `store.ts` (валидация, нумерация, налог 4%/6%, localStorage) → история/печать/JSON.
+- **Заказы**: `app/orders` → `store.ts` (сид `orders.json` + публикации пользователя) → фильтры/отклики.
+- **Дашборд**: `app/index` → агрегация `store.ts` (доход, налог, график SVG).
 - **Аналитика**: `track(event)` → PostHog / Метрика / console (graceful degradation).
 
 ## Точки расширения для бэкенда
 
-| Сейчас (мок) | Позже (бэкенд) | Что менять |
+| Сейчас (локально) | Позже (бэкенд) | Что менять |
 |---|---|---|
-| `MockOrdersRepository` | `HttpOrdersRepository` (REST `/api/orders`) | 1 класс + фабрика |
-| `MockReceiptsRepository` | `HttpReceiptsRepository` | 1 класс |
+| `store.ts` → localStorage (заказы) | `HttpOrdersRepository` (REST `/api/orders`) | 1 модуль + фабрика |
+| `store.ts` → localStorage (чеки) | `HttpReceiptsRepository` + фискализация ФНС | 1 модуль |
 | `submitLead` → Formspree | `POST /api/leads` | 1 функция |
-| `orders.json` | БД (Postgres) | удалить файл |
-| feature flag захардкожен | PostHog flags | `analytics.ts` |
+| сид `orders.json` | БД (Postgres) | удалить файл |
+| фискализация — демо-заглушка | API «Мой налог» (ИНН, ключи) | новый модуль + секреты |
+| уведомления — нет | Telegram/email-рассылка | новый модуль |
 
 ## Производительность и a11y
 

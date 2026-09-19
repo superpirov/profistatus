@@ -1,0 +1,164 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+---
+<BaseLayout title="Чеки" description="Генератор предчеков самозанятого: налог 4%/6%, история, печать, экспорт." path="/app/receipts">
+  <div class="mx-auto max-w-6xl px-4 pt-8">
+    <h1 class="text-3xl font-bold">Чеки</h1>
+    <p class="mt-1 text-sm text-slate-600">
+      Формируется <strong>предчек</strong>: юридически значимая фискализация в ФНС
+      потребует бэкенд и ваши данные самозанятого — этот шаг оставлен как демо-заглушка ниже.
+      Расчёт налога (4% физлица / 6% юрлица и ИП) и лимит 2,4 млн ₽ — уже рабочие.
+    </p>
+
+    <div class="mt-6 grid gap-6 md:grid-cols-2 items-start">
+      <form id="receipt-form" class="rounded-2xl border bg-white p-5 grid gap-3 text-sm" novalidate>
+        <h2 class="font-semibold text-base">Новый предчек</h2>
+        <label class="grid gap-1">Услуга или товар
+          <input id="f-service" class="rounded-lg border px-3 py-2" placeholder="Например: дизайн лендинга" />
+        </label>
+        <label class="grid gap-1">Клиент
+          <input id="f-client" class="rounded-lg border px-3 py-2" placeholder="Имя, ИП или организация" />
+        </label>
+        <fieldset class="grid gap-1">
+          <legend>Кто платит</legend>
+          <label class="flex gap-2 items-center"><input type="radio" name="ctype" value="individual" checked /> Физлицо — налог 4%</label>
+          <label class="flex gap-2 items-center"><input type="radio" name="ctype" value="company" /> Юрлицо / ИП — налог 6%</label>
+        </fieldset>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="grid gap-1">Сумма, ₽
+            <input id="f-amount" type="number" min="1" class="rounded-lg border px-3 py-2" placeholder="15000" />
+          </label>
+          <label class="grid gap-1">Дата
+            <input id="f-date" type="date" class="rounded-lg border px-3 py-2" />
+          </label>
+        </div>
+        <p class="rounded-xl bg-slate-50 p-3">Налог к уплате: <strong id="f-tax">—</strong></p>
+        <ul id="f-errors" class="text-red-700 text-sm grid gap-1" aria-live="polite"></ul>
+        <button class="rounded-lg bg-indigo-600 px-4 py-2.5 text-white font-medium hover:bg-indigo-700">Выставить чек</button>
+      </form>
+
+      <section class="rounded-2xl border bg-white p-5" aria-label="Фискализация">
+        <h2 class="font-semibold text-base">Фискализация в ФНС <span class="text-xs font-normal text-amber-700 bg-amber-100 rounded px-2 py-0.5">нужен бэкенд</span></h2>
+        <p class="mt-2 text-sm text-slate-600">
+          Чтобы чек стал fiscal-документом, нужны: ваш ИНН и статус самозанятого,
+          интеграция с API «Мой налог» / ФНС и сервер для хранения ключей.
+          Пришлите эти данные — подключим. Пока чеки сохраняются локально и печатаются как предчеки.
+        </p>
+        <button id="fiscal-btn" class="mt-3 rounded-lg border px-4 py-2 text-sm hover:bg-slate-50">Отправить последний чек в ФНС (демо)</button>
+        <p id="fiscal-status" class="mt-2 text-sm text-slate-600" role="status" aria-live="polite"></p>
+      </section>
+    </div>
+
+    <section class="mt-6 rounded-2xl border bg-white p-5" aria-label="История чеков">
+      <h2 class="font-semibold text-base">История</h2>
+      <ul id="history" class="mt-3 grid gap-2 text-sm"></ul>
+    </section>
+  </div>
+
+  <!-- Печатная форма: видна только на печати (см. global.css) -->
+  <div id="print-root" class="print-area" aria-hidden="true"></div>
+</BaseLayout>
+
+<script>
+  import { addReceipt, fmtDate, fmtMoney, calcTax, getReceipts, removeReceipt, todayIso, validateReceipt } from '@/lib/store';
+  import { track } from '@/lib/analytics';
+
+  const service = document.getElementById('f-service');
+  const client = document.getElementById('f-client');
+  const amount = document.getElementById('f-amount');
+  const date = document.getElementById('f-date');
+  const taxEl = document.getElementById('f-tax');
+  const errorsEl = document.getElementById('f-errors');
+  const history = document.getElementById('history');
+  date.value = todayIso();
+
+  function readForm() {
+    const ctype = document.querySelector('input[name="ctype"]:checked');
+    return {
+      service: service.value ?? '',
+      client: client.value ?? '',
+      clientType: (ctype?.value ?? 'individual'),
+      amount: Number(amount.value),
+      date: date.value ?? '',
+    };
+  }
+
+  function refreshTax() {
+    const f = readForm();
+    taxEl.textContent = Number.isFinite(f.amount) && f.amount > 0 ? fmtMoney(calcTax(f.amount, f.clientType)) : '—';
+  }
+  [service, client, amount, date].forEach((el) => el?.addEventListener('input', refreshTax));
+  document.querySelectorAll('input[name="ctype"]').forEach((el) => el.addEventListener('change', refreshTax));
+  refreshTax();
+
+  function renderHistory() {
+    const all = getReceipts();
+    history.innerHTML = all.length
+      ? all.map((r) => `<li class="rounded-xl border p-3 flex flex-wrap items-center gap-2 justify-between">
+          <span><strong>№${r.number}</strong> · ${r.service} · ${r.client} · ${fmtDate(r.date)} · <strong>${fmtMoney(r.amount)}</strong> <span class="text-slate-500">(налог ${fmtMoney(r.tax)})</span></span>
+          <span class="flex gap-2">
+            <button data-print="${r.id}" class="rounded-lg border px-3 py-1 hover:bg-slate-50">Печать</button>
+            <button data-dl="${r.id}" class="rounded-lg border px-3 py-1 hover:bg-slate-50">JSON</button>
+            <button data-del="${r.id}" class="rounded-lg border px-3 py-1 text-red-700 hover:bg-red-50">Удалить</button>
+          </span></li>`).join('')
+      : '<li class="text-slate-500">Чеков пока нет — выставьте первый выше.</li>';
+  }
+  renderHistory();
+
+  document.getElementById('receipt-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = readForm();
+    const errors = validateReceipt(input);
+    errorsEl.innerHTML = errors.map((x) => `<li>• ${x}</li>`).join('');
+    if (errors.length) return;
+    addReceipt(input);
+    track('receipt_created', { amount: input.amount });
+    service.value = ''; client.value = ''; amount.value = '';
+    refreshTax();
+    renderHistory();
+  });
+
+  // Печать предчека через скрытый print-блок
+  function printReceipt(id) {
+    const r = getReceipts().find((x) => x.id === id);
+    if (!r) return;
+    document.getElementById('print-root').innerHTML = `
+      <h1>Предчек №${r.number} от ${fmtDate(r.date)}</h1>
+      <p>ProfiStatus · демонстрационный документ, не является fiscal-чеком ФНС</p>
+      <hr />
+      <p>Услуга: ${r.service}</p>
+      <p>Клиент: ${r.client} (${r.clientType === 'company' ? 'юрлицо/ИП, налог 6%' : 'физлицо, налог 4%'})</p>
+      <p><strong>Сумма: ${fmtMoney(r.amount)}</strong></p>
+      <p>Расчётный налог НПД: ${fmtMoney(r.tax)}</p>`;
+    document.body.classList.add('printing');
+    window.print();
+  }
+  window.addEventListener('afterprint', () => document.body.classList.remove('printing'));
+
+  function downloadJson(id) {
+    const r = getReceipts().find((x) => x.id === id);
+    if (!r) return;
+    const blob = new Blob([JSON.stringify(r, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `receipt-${r.number}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  history.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    if (btn.dataset.print) printReceipt(btn.dataset.print);
+    if (btn.dataset.dl) downloadJson(btn.dataset.dl);
+    if (btn.dataset.del) { removeReceipt(btn.dataset.del); renderHistory(); }
+  });
+
+  // Демо-заглушка фискализации: ждёт бэкенд и данные самозанятого
+  document.getElementById('fiscal-btn').addEventListener('click', () => {
+    const last = getReceipts()[0];
+    document.getElementById('fiscal-status').textContent = last
+      ? `Чек №${last.number} подготовлен к отправке, но интеграция с ФНС не подключена. Нужны ИНН и серверный ключ — напишите нам через форму заявки.`
+      : 'Сначала выставьте хотя бы один чек.';
+  });
+</script>

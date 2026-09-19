@@ -19,8 +19,7 @@
      async list() { return (await fetch('/api/orders')).json(); }
    }
    ```
-3. Переключить фабрику в `mockRepositories.ts` → `httpRepositories.ts` по флагу
-   `NEXT_PUBLIC_USE_MOCK`.
+3. Переключить `src/lib/store.ts` на HTTP-реализации (localStorage оставить как офлайн-фолбэк).
 4. Перенести лиды из Formspree/Airtable в БД (экспорт CSV → импорт).
 5. DNS: кастомный домен → новый хостинг, `base` убрать, редиректы со старых URL.
 

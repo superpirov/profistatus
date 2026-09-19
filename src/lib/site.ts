@@ -13,7 +13,7 @@ export function link(path: string): string {
   return `${basePath}${path.replace(/^\//, '')}`;
 }
 
-/** Абсолютный canonical URL с учётом base, например '.../profistatus/demo/freelancer' */
+/** Абсолютный canonical URL с учётом base, например '.../profistatus/app/receipts' */
 export function canonicalUrl(path = '/'): string {
   const origin: string = (import.meta.env.SITE ?? 'https://superpirov.github.io').replace(/\/$/, '');
   const base = basePath.replace(/^\//, '');

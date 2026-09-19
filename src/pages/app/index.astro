@@ -1,0 +1,86 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { link } from '@/lib/site';
+---
+<BaseLayout title="Кабинет" description="Рабочий кабинет ProfiStatus: доход, чеки, заказы." path="/app">
+  <div class="mx-auto max-w-6xl px-4 pt-8">
+    <h1 class="text-3xl font-bold">Кабинет</h1>
+    <p class="mt-1 text-sm text-slate-600">
+      Данные хранятся локально в вашем браузере. Общая база между пользователями,
+      фискализация в ФНС и выплаты появятся с бэкендом.
+    </p>
+
+    <div class="mt-4 grid gap-3 sm:grid-cols-4 text-sm" id="stats">
+      <div class="rounded-xl border bg-white p-4"><p class="text-slate-500">Доход за <span id="stat-year"></span></p><p class="text-2xl font-bold" id="stat-total">—</p></div>
+      <div class="rounded-xl border bg-white p-4"><p class="text-slate-500">Налог к уплате (оценка)</p><p class="text-2xl font-bold" id="stat-tax">—</p></div>
+      <div class="rounded-xl border bg-white p-4"><p class="text-slate-500">Чеков выставлено</p><p class="text-2xl font-bold" id="stat-count">—</p></div>
+      <div class="rounded-xl border bg-white p-4"><p class="text-slate-500">Моих заказов</p><p class="text-2xl font-bold" id="stat-orders">—</p></div>
+    </div>
+
+    <div class="mt-6 grid gap-6 md:grid-cols-2">
+      <section class="rounded-2xl border bg-white p-5" aria-label="Доход по месяцам">
+        <h2 class="font-semibold">Доход за последние 6 месяцев</h2>
+        <div id="chart" class="mt-3"></div>
+        <p id="chart-empty" class="mt-2 text-sm text-slate-500" hidden>
+          Пока нет чеков — <a class="underline" href={link('app/receipts')}>выставьте первый</a>, и здесь появится график.
+        </p>
+      </section>
+      <section class="rounded-2xl border bg-white p-5" aria-label="Последние чеки">
+        <div class="flex items-center justify-between">
+          <h2 class="font-semibold">Последние чеки</h2>
+          <a class="text-sm underline" href={link('app/receipts')}>Все чеки</a>
+        </div>
+        <ul id="recent" class="mt-3 grid gap-2 text-sm"></ul>
+      </section>
+    </div>
+
+    <div class="mt-6 grid gap-3 sm:grid-cols-3 text-sm">
+      <a href={link('app/receipts')} class="rounded-2xl border bg-indigo-600 text-white p-5 hover:bg-indigo-700">
+        <strong class="block text-base">🧾 Новый чек</strong>
+        <span class="text-indigo-100">Предчек за 1 минуту: налог 4%/6%, печать, экспорт</span>
+      </a>
+      <a href={link('app/orders')} class="rounded-2xl border bg-white p-5 hover:shadow-sm">
+        <strong class="block text-base">📋 Биржа заказов</strong>
+        <span class="text-slate-600">Смотрите заказы, публикуйте свои, откликайтесь</span>
+      </a>
+      <a href={link('app/business')} class="rounded-2xl border bg-white p-5 hover:shadow-sm">
+        <strong class="block text-base">🏢 Панель заказчика</strong>
+        <span class="text-slate-600">Ваши публикации и отклики исполнителей</span>
+      </a>
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  import { fmtMoney, getMyOrders, getReceipts, monthlyTotals, yearTax, yearTotal } from '@/lib/store';
+
+  const year = new Date().getFullYear();
+  const receipts = getReceipts();
+  document.getElementById('stat-year')!.textContent = String(year);
+  document.getElementById('stat-total')!.textContent = fmtMoney(yearTotal(year));
+  document.getElementById('stat-tax')!.textContent = fmtMoney(yearTax(year));
+  document.getElementById('stat-count')!.textContent = String(receipts.length);
+  document.getElementById('stat-orders')!.textContent = String(getMyOrders().length);
+
+  // Простой SVG-график без внешних библиотек
+  const months = monthlyTotals();
+  const max = Math.max(1, ...months.map((m) => m.total));
+  const chart = document.getElementById('chart')!;
+  if (months.every((m) => m.total === 0)) {
+    document.getElementById('chart-empty')!.hidden = false;
+  } else {
+    const W = 320, H = 120;
+    const bars = months.map((m, i) => {
+      const h = Math.round((m.total / max) * (H - 24));
+      const x = 10 + i * ((W - 20) / months.length);
+      const w = (W - 20) / months.length - 10;
+      return `<g><rect x="${x}" y="${H - 18 - h}" width="${w}" height="${h}" rx="4" fill="#4f46e5"><title>${m.label}: ${fmtMoney(m.total)}</title></rect><text x="${x + w / 2}" y="${H - 4}" font-size="10" text-anchor="middle" fill="#64748b">${m.label}</text></g>`;
+    }).join('');
+    chart.innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="w-full" role="img" aria-label="График дохода">${bars}</svg>`;
+  }
+
+  const recent = document.getElementById('recent')!;
+  recent.innerHTML = receipts.length
+    ? receipts.slice(0, 5).map((r) => `<li class="rounded-xl bg-slate-50 p-3 flex justify-between gap-2"><span>№${r.number} · ${r.service}</span><strong>${fmtMoney(r.amount)}</strong></li>`).join('')
+    : '<li class="text-slate-500">Чеков пока нет.</li>';
+</script>

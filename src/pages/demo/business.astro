@@ -1,25 +1,16 @@
 ---
-import BaseLayout from '@/layouts/BaseLayout.astro';
-import DemoBanner from '@/components/DemoBanner.astro';
-
-// Мок сделок заказчика: при миграции — через IDealsRepository
-const deals = [
-  { id: 'D-101', performer: 'Алина · дизайнер', task: 'Лендинг кофейни', status: 'Чек получен', amount: 15000 },
-  { id: 'D-102', performer: 'Игорь · разработчик', task: 'Telegram-бот', status: 'В работе', amount: 40000 },
-  { id: 'D-103', performer: 'Мария · копирайтер', task: '10 статей', status: 'Ожидает чек', amount: 20000 },
-];
+import { link } from '@/lib/site';
+const target = link('app/business/');
 ---
-<BaseLayout title="Демо: кабинет заказчика" description="Демонстрация кабинета юрлица." path="/demo/business">
-  <DemoBanner />
-  <div class="mx-auto max-w-6xl px-4 pt-8">
-    <h1 class="text-3xl font-bold">Кабинет заказчика (демо)</h1>
-    <ul class="mt-4 grid gap-2 text-sm">
-      {deals.map((d) => (
-        <li class="rounded-xl border bg-white p-4 flex flex-wrap justify-between gap-2">
-          <span><strong>{d.id}</strong> · {d.performer} · {d.task}</span>
-          <span>{d.status} · <strong>{d.amount.toLocaleString('ru-RU')} ₽</strong></span>
-        </li>
-      ))}
-    </ul>
-  </div>
-</BaseLayout>
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="refresh" content={`0;url=${target}`} />
+    <link rel="canonical" href={target} />
+    <title>Переезд в панель заказчика — ProfiStatus</title>
+  </head>
+  <body>
+    <p>Раздел переехал в <a href={target}>панель заказчика</a>.</p>
+  </body>
+</html>

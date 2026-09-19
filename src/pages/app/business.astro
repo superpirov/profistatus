@@ -1,0 +1,56 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { link } from '@/lib/site';
+---
+<BaseLayout title="Панель заказчика" description="Ваши заказы и отклики исполнителей." path="/app/business">
+  <div class="mx-auto max-w-6xl px-4 pt-8">
+    <h1 class="text-3xl font-bold">Панель заказчика</h1>
+    <p class="mt-1 text-sm text-slate-600">
+      Публикуйте задачи на <a class="underline" href={link('app/orders')}>бирже</a> — отклики исполнителей соберутся здесь.
+    </p>
+
+    <div class="mt-4 grid gap-3 sm:grid-cols-3 text-sm" id="bstats">
+      <div class="rounded-xl border bg-white p-4"><p class="text-slate-500">Активных публикаций</p><p class="text-2xl font-bold" id="b-active">—</p></div>
+      <div class="rounded-xl border bg-white p-4"><p class="text-slate-500">Всего откликов</p><p class="text-2xl font-bold" id="b-resp">—</p></div>
+      <div class="rounded-xl border bg-white p-4"><p class="text-slate-500">Суммарный бюджет</p><p class="text-2xl font-bold" id="b-budget">—</p></div>
+    </div>
+
+    <section class="mt-6 rounded-2xl border bg-white p-5" aria-label="Мои заказы">
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold">Мои заказы</h2>
+        <a class="text-sm underline" href={link('app/orders')}>+ Новый заказ</a>
+      </div>
+      <ul id="blist" class="mt-3 grid gap-2 text-sm"></ul>
+    </section>
+
+    <section class="mt-6 rounded-2xl border border-dashed p-5 text-sm" aria-label="Что дальше">
+      <h2 class="font-semibold">Что появится с бэкендом <span class="text-xs font-normal text-amber-700 bg-amber-100 rounded px-2 py-0.5">нужны данные</span></h2>
+      <ul class="mt-2 grid gap-1 text-slate-600">
+        <li>• Автопроверка статуса самозанятого в ФНС перед выплатой — нужен API-ключ и ИНН исполнителей.</li>
+        <li>• Автодоговор и закрывающие документы к каждой сделке — нужен шаблон договора от вашего юриста.</li>
+        <li>• Безопасная сделка с холдированием оплаты — нужна платёжная интеграция (эквайринг/СБП).</li>
+        <li>• Уведомления об откликах (Telegram/email) — нужен endpoint рассылки (Formspree/ Unisender).</li>
+      </ul>
+      <p class="mt-2">Пришлите эти данные — реализуем следующим этапом без переделки кабинета.</p>
+    </section>
+  </div>
+</BaseLayout>
+
+<script>
+  import { fmtMoney, fmtDate, getMyOrders } from '@/lib/store';
+
+  const mine = getMyOrders();
+  document.getElementById('b-active').textContent = String(mine.length);
+  document.getElementById('b-resp').textContent = String(mine.reduce((s, o) => s + o.responses, 0));
+  document.getElementById('b-budget').textContent = fmtMoney(mine.reduce((s, o) => s + o.budget, 0));
+
+  document.getElementById('blist').innerHTML = mine.length
+    ? mine.map((o) => `<li class="rounded-xl border p-4 flex flex-wrap justify-between gap-2">
+        <span><strong>${o.title}</strong> · ${o.category} · ${fmtDate(o.postedAt)}<br />
+        <span class="text-slate-600">Откликов: <strong>${o.responses}</strong> · бюджет ${fmtMoney(o.budget)}</span></span>
+        ${o.responses
+          ? '<span class="text-sm text-green-700 font-medium">Есть отклики — свяжитесь: ' + o.contact + '</span>'
+          : '<span class="text-sm text-slate-500">Откликов пока нет</span>'}
+      </li>`).join('')
+    : '<li class="text-slate-500">Вы ещё ничего не публиковали.</li>';
+</script>

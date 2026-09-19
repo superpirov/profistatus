@@ -14,3 +14,31 @@ html {
 body {
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 }
+
+/* Печать предчека: print-блок вложен в main, поэтому прячем через visibility */
+.print-area {
+  display: none;
+}
+
+@media print {
+  body.printing {
+    background: #fff;
+  }
+  body.printing *:not(.print-area):not(.print-area *) {
+    visibility: hidden;
+  }
+  body.printing .print-area,
+  body.printing .print-area * {
+    visibility: visible;
+  }
+  body.printing .print-area {
+    display: block !important;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 24px;
+    font-size: 14px;
+    color: #000;
+  }
+}
