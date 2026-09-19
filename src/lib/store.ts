@@ -303,6 +303,7 @@ export interface PayProfile {
   bank: string; // банк получателя
   card: string; // номер карты (необязательно)
   sbpPayload: string; // SBP-строка из банка для настоящей оплаты (необязательно)
+  qrImage: string; // фото/скрин QR из банка, dataURL (альтернатива строке)
 }
 
 export interface Invoice {
@@ -316,15 +317,16 @@ export interface Invoice {
   phone: string;
   bank: string;
   card: string;
-  qrKind: 'sbp' | 'details';
-  qrText: string; // что именно закодировано в QR
+  qrKind: 'sbp' | 'details' | 'image';
+  qrText: string; // что именно закодировано в QR (для sbp/details)
+  qrImage: string; // картинка QR из банка (для image), dataURL
   status: 'unpaid' | 'paid';
   createdAt: string; // ISO
   paidAt?: string; // ISO
 }
 
 export function getPayProfile(): PayProfile {
-  return load<PayProfile>(KEYS.profile, { payee: '', phone: '', bank: '', card: '', sbpPayload: '' });
+  return load<PayProfile>(KEYS.profile, { payee: '', phone: '', bank: '', card: '', sbpPayload: '', qrImage: '' });
 }
 
 export function savePayProfile(p: PayProfile): void {
@@ -334,6 +336,7 @@ export function savePayProfile(p: PayProfile): void {
     bank: p.bank.trim(),
     card: p.card.trim(),
     sbpPayload: p.sbpPayload.trim(),
+    qrImage: p.qrImage, // dataURL из input[type=file], не тримим содержимое
   });
 }
 
@@ -368,13 +371,15 @@ export function validateInvoice(input: InvoiceInput): string[] {
   if (!input.client.trim()) errors.push('Укажите клиента.');
   if (!Number.isFinite(input.amount) || input.amount <= 0) errors.push('Сумма должна быть больше нуля.');
   const p = getPayProfile();
-  if (!p.phone && !p.card && !p.sbpPayload)
-    errors.push('Заполните реквизиты (телефон, карту или SBP-строку) — иначе клиенту некуда платить.');
+  if (!p.phone && !p.card && !p.sbpPayload && !p.qrImage)
+    errors.push('Заполните реквизиты (телефон, карту, SBP-строку или фото QR) — иначе клиенту некуда платить.');
   return errors;
 }
 
 export function addInvoice(input: InvoiceInput): Invoice {
   const p = getPayProfile();
+  // Приоритет: настоящая SBP-строка > фото QR из банка > текстовая визитка
+  const kind: Invoice['qrKind'] = p.sbpPayload ? 'sbp' : p.qrImage ? 'image' : 'details';
   const qr = buildQr(p, input.client.trim(), Math.round(input.amount));
   const inv: Invoice = {
     id: `inv-${Date.now().toString(36)}`,
@@ -386,8 +391,9 @@ export function addInvoice(input: InvoiceInput): Invoice {
     phone: p.phone.trim(),
     bank: p.bank.trim(),
     card: p.card.trim(),
-    qrKind: qr.kind,
-    qrText: qr.text,
+    qrKind: kind,
+    qrText: kind === 'image' ? '' : qr.text,
+    qrImage: kind === 'image' ? p.qrImage : '',
     status: 'unpaid',
     createdAt: new Date().toISOString(),
   };
