@@ -1,0 +1,19 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import LeadForm from '@/components/LeadForm.astro';
+---
+<BaseLayout title="Бизнесу" description="Легальная работа с самозанятыми: проверка статусов, договоры, закрывающие документы." path="/business">
+  <div class="mx-auto max-w-6xl px-4 pt-10 grid gap-8 md:grid-cols-2">
+    <div>
+      <h1 class="text-3xl font-bold">Нанимайте самозанятых без рисков</h1>
+      <ul class="mt-4 grid gap-2 text-sm">
+        <li class="rounded-xl border bg-white p-3">✅ Проверка статуса самозанятого перед выплатой</li>
+        <li class="rounded-xl border bg-white p-3">✅ Договор и чек автоматически к каждой сделке</li>
+        <li class="rounded-xl border bg-white p-3">✅ Защита от переквалификации в трудовые отношения</li>
+      </ul>
+      <h2 class="mt-6 text-xl font-semibold">Кейс</h2>
+      <p class="mt-2 text-sm text-slate-600">ООО «Вектор»: 5 дизайнеров, закрывающие документы за 1 день вместо недели, экономия 13% на взносах vs ГПХ.</p>
+    </div>
+    <LeadForm segment="business" title="Заявка на подбор исполнителей" />
+  </div>
+</BaseLayout>

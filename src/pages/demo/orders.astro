@@ -1,0 +1,38 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import DemoBanner from '@/components/DemoBanner.astro';
+import { repositories } from '@/lib/mockRepositories';
+
+const orders = await repositories.orders.list();
+---
+<BaseLayout title="Демо: витрина заказов" description="Демонстрация витрины заказов с фильтрами." path="/demo/orders">
+  <DemoBanner />
+  <div class="mx-auto max-w-6xl px-4 pt-8">
+    <h1 class="text-3xl font-bold">Витрина заказов (демо)</h1>
+    <label class="mt-4 block text-sm">Фильтр по категории:
+      <input id="orders-filter" class="ml-2 rounded-lg border px-3 py-1.5" placeholder="например, Дизайн" />
+    </label>
+    <ul id="orders-list" class="mt-4 grid gap-2 text-sm">
+      {orders.map((o) => (
+        <li data-category={o.category} class="rounded-xl border bg-white p-4">
+          <div class="flex justify-between gap-2"><strong>{o.title}</strong><span>{o.budget.toLocaleString('ru-RU')} ₽</span></div>
+          <p class="text-slate-600">{o.category} · {o.city} · {o.postedAt}</p>
+          <p class="mt-1">{o.description}</p>
+        </li>
+      ))}
+    </ul>
+  </div>
+</BaseLayout>
+
+<script is:inline>
+  // Простой клиентский фильтр без бэкенда
+  const input = document.getElementById('orders-filter');
+  const list = document.getElementById('orders-list');
+  input?.addEventListener('input', () => {
+    const q = (input.value ?? '').toLowerCase();
+    list?.querySelectorAll('li').forEach((li) => {
+      const text = (li.textContent ?? '').toLowerCase();
+      li.style.display = text.includes(q) ? '' : 'none';
+    });
+  });
+</script>

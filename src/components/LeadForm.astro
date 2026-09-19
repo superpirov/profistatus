@@ -1,0 +1,61 @@
+---
+// Форма сбора лидов через Formspree (п. 3.3 ТЗ).
+// Работает без бэкенда; при отсутствии ключа — mock-режим (см. leadService).
+interface Props {
+  segment?: 'freelancer' | 'business' | 'feedback';
+  title?: string;
+}
+const { segment = 'freelancer', title = 'Оставьте заявку' } = Astro.props;
+---
+<section id="lead-form" aria-label="Форма заявки" class="rounded-2xl border bg-white p-6 shadow-sm">
+  <h2 class="text-xl font-semibold">{title}</h2>
+  <p class="mt-1 text-sm text-slate-600">Ответим в течение дня. Никакого спама.</p>
+  <form data-lead-form={segment} class="mt-4 grid gap-3" novalidate>
+    <label class="grid gap-1 text-sm">
+      Имя
+      <input name="name" required autocomplete="name" class="rounded-lg border px-3 py-2" placeholder="Как к вам обращаться" />
+    </label>
+    <label class="grid gap-1 text-sm">
+      Телефон или Telegram
+      <input name="contact" required autocomplete="tel" class="rounded-lg border px-3 py-2" placeholder="+7 ___ ___-__-__ или @nick" />
+    </label>
+    <label class="grid gap-1 text-sm">
+      Комментарий (необязательно)
+      <textarea name="comment" rows="3" class="rounded-lg border px-3 py-2" placeholder="Чем помочь?"></textarea>
+    </label>
+    <button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2.5 text-white font-medium hover:bg-indigo-700 focus-visible:outline-2">
+      Отправить заявку
+    </button>
+    <p data-form-status role="status" class="text-sm text-slate-600" aria-live="polite"></p>
+    <p class="text-xs text-slate-500">Нажимая кнопку, вы соглашаетесь с <a class="underline" href={`${import.meta.env.BASE_URL}legal`}>политикой конфиденциальности</a>.</p>
+  </form>
+</section>
+
+<script>
+  import { submitLead } from '@/lib/leadService';
+  import { track } from '@/lib/analytics';
+
+  document.querySelectorAll('[data-lead-form]').forEach((form) => {
+    if (!(form instanceof HTMLFormElement)) return;
+    const status = form.querySelector('[data-form-status]');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = new FormData(form);
+      const payload = {
+        name: String(data.get('name') ?? '').trim(),
+        contact: String(data.get('contact') ?? '').trim(),
+        comment: String(data.get('comment') ?? '').trim() || undefined,
+        segment: (form.dataset.leadForm ?? 'freelancer') as 'freelancer' | 'business' | 'feedback',
+      };
+      if (!payload.name || !payload.contact) {
+        if (status) status.textContent = 'Заполните имя и контакт для связи.';
+        return;
+      }
+      if (status) status.textContent = 'Отправляем…';
+      track('lead_submit', { segment: payload.segment });
+      const ok = await submitLead(payload);
+      if (status) status.textContent = ok ? 'Спасибо! Заявка отправлена.' : 'Ошибка отправки. Попробуйте позже.';
+      if (ok) form.reset();
+    });
+  });
+</script>

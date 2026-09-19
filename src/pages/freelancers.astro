@@ -1,0 +1,26 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import LeadForm from '@/components/LeadForm.astro';
+---
+<BaseLayout title="Исполнителям" description="Самозанятость без бюрократии: чеки, заказы, легальные выплаты." path="/freelancers">
+  <div class="mx-auto max-w-6xl px-4 pt-10 grid gap-8 md:grid-cols-2">
+    <div>
+      <h1 class="text-3xl font-bold">Самозанятость без бюрократии</h1>
+      <h2 class="mt-6 text-xl font-semibold">ProfiStatus vs «Мой налог»</h2>
+      <table class="mt-3 w-full text-sm border rounded-xl overflow-hidden bg-white">
+        <thead><tr class="bg-slate-100 text-left"><th class="p-2">Критерий</th><th class="p-2">Мой налог</th><th class="p-2">ProfiStatus</th></tr></thead>
+        <tbody>
+          <tr class="border-t"><td class="p-2">Поиск заказов</td><td class="p-2">Нет</td><td class="p-2">Витрина + подбор</td></tr>
+          <tr class="border-t"><td class="p-2">Договоры с юрлицами</td><td class="p-2">Вручную</td><td class="p-2">Автоматически</td></tr>
+          <tr class="border-t"><td class="p-2">Поддержка</td><td class="p-2">ФНС</td><td class="p-2">Живой чат</td></tr>
+        </tbody>
+      </table>
+      <h2 class="mt-6 text-xl font-semibold">Тарифы (MVP)</h2>
+      <ul class="mt-2 text-sm grid gap-2">
+        <li class="rounded-xl border bg-white p-3"><strong>Старт — 0 ₽:</strong> чеки, 3 отклика в месяц</li>
+        <li class="rounded-xl border bg-white p-3"><strong>Про — 490 ₽/мес:</strong> безлимит, договоры, приоритет</li>
+      </ul>
+    </div>
+    <LeadForm segment="freelancer" title="Зарегистрироваться в лист ожидания" />
+  </div>
+</BaseLayout>

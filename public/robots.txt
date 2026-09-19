@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://superpirov.github.io/profistatus/sitemap-index.xml

@@ -1,0 +1,41 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import LeadForm from '@/components/LeadForm.astro';
+import Calculator from '@/components/Calculator.astro';
+const base = import.meta.env.BASE_URL;
+---
+<BaseLayout title="Легализация самозанятых без боли" description="ProfiStatus помогает исполнителям и бизнесу работать легально: чеки, договоры, безопасные сделки.">
+  <section class="mx-auto max-w-6xl px-4 pt-12 grid gap-8 md:grid-cols-2 items-start">
+    <div>
+      <!-- A/B-тест заголовка: вариант A. Вариант B переключается через PostHog feature flag -->
+      <h1 class="text-4xl font-bold leading-tight" data-ab="hero-title-a">Работайте легально как самозанятый — за 10 минут</h1>
+      <p class="mt-4 text-lg text-slate-600">Чеки, договоры и выплаты от юрлиц без страха блокировок. Для исполнителей и бизнеса.</p>
+      <div class="mt-6 flex flex-wrap gap-3">
+        <a href={`${base}freelancers`} class="rounded-lg bg-indigo-600 px-5 py-3 text-white font-medium">Я исполнитель</a>
+        <a href={`${base}business`} class="rounded-lg border px-5 py-3 font-medium bg-white">Я бизнес</a>
+      </div>
+      <dl class="mt-8 grid grid-cols-3 gap-4 text-sm">
+        <div><dt class="text-slate-500">Экономия на налогах</dt><dd class="text-xl font-bold">до 7%</dd></div>
+        <div><dt class="text-slate-500">Оформление чека</dt><dd class="text-xl font-bold">1 мин</dd></div>
+        <div><dt class="text-slate-500">Комиссия MVP</dt><dd class="text-xl font-bold">0%</dd></div>
+      </dl>
+    </div>
+    <Calculator />
+  </section>
+
+  <section class="mx-auto max-w-6xl px-4 mt-12 grid gap-8 md:grid-cols-2">
+    <div class="rounded-2xl border bg-white p-6">
+      <h2 class="text-xl font-semibold">Отзывы</h2>
+      <blockquote class="mt-3 text-sm text-slate-700">«Оформила самозанятость и первый чек прямо из демо. Жду запуск!» — Алина, дизайнер</blockquote>
+      <blockquote class="mt-3 text-sm text-slate-700">«Закрыли 5 исполнителей без риска переквалификации.» — ООО «Вектор»</blockquote>
+    </div>
+    <LeadForm segment="freelancer" title="Получить ранний доступ" />
+  </section>
+
+  <section class="mx-auto max-w-6xl px-4 mt-12">
+    <h2 class="text-2xl font-bold">Частые вопросы</h2>
+    <details class="mt-3 rounded-xl border bg-white p-4"><summary class="font-medium cursor-pointer">Это бесплатно?</summary><p class="mt-2 text-sm text-slate-600">MVP бесплатно для ранних пользователей. Тарифы появятся на странице исполнителей.</p></details>
+    <details class="mt-3 rounded-xl border bg-white p-4"><summary class="font-medium cursor-pointer">Мои данные в безопасности?</summary><p class="mt-2 text-sm text-slate-600">Мы не храним паспортные данные в MVP. Заявки идут через Formspree по HTTPS.</p></details>
+    <details class="mt-3 rounded-xl border bg-white p-4"><summary class="font-medium cursor-pointer">Когда запуск?</summary><p class="mt-2 text-sm text-slate-600">Собираем заявки сейчас, запуск — по мере набора первых 500 лидов.</p></details>
+  </section>
+</BaseLayout>

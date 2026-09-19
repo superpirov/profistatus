@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+/* Базовые токены дизайн-системы ProfiStatus.
+   Компоненты shadcn/ui будут опираться на эти CSS-переменные при миграции. */
+:root {
+  --brand: #4f46e5;
+  --brand-ink: #312e81;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
